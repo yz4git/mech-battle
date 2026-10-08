@@ -1,0 +1,8 @@
+{
+  "name": "mech-battle-iron-salvage",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A mobile-first modular 3D mech builder and auto battler with 1,664 collectible parts.",
+  "scripts": { "test": "node --test tests/*.test.js", "start": "node dev-server.mjs", "dev": "node dev-server.mjs", "build": "node build.mjs" }
+}

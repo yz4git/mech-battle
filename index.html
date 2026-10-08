@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#101820">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="1,664種類のメカパーツを回収し、機体を組み上げる3Dオートバトルゲーム。">
+  <title>MECH BATTLE / IRON SALVAGE</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css?v=1.0.0">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-symbol" aria-hidden="true">M<span>／</span>B</span><div><strong>IRON SALVAGE</strong><small>MECH BATTLE</small></div></div>
+    <div class="account"><span class="collection-counter" id="collection-count"></span><span class="credit"><small>CR</small> <b id="credits">1,800</b></span><button class="icon-button" id="sound-toggle" aria-label="サウンド切り替え"></button><button class="icon-button" id="settings" aria-label="設定とセーブ"></button></div>
+  </header>
+  <main id="main">
+    <section id="viewport" aria-label="機体プレビュー">
+      <div class="scene-vignette"></div>
+      <div id="scene-meta"><span class="eyebrow">HANGAR / 07</span><h1>CINDER-01</h1></div>
+      <div id="scene-status"></div>
+      <div id="battle-hud" hidden></div>
+      <div id="scene-bottom"></div>
+      <div id="loading">格納庫を起動中…</div>
+    </section>
+    <aside id="panel" aria-label="機体と任務の操作"></aside>
+  </main>
+  <nav id="nav" aria-label="メニュー"></nav>
+</div>
+<dialog id="sheet"><div id="sheet-content"></div></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<input id="import-file" type="file" accept="application/json,.json" hidden>
+<script>
+  window.addEventListener('error',function(e){if(!document.querySelector('#panel').children.length){document.querySelector('#loading').textContent='起動に失敗しました。ページを再読み込みしてください。';}});
+</script>
+<script type="module" src="./src/main.js?v=1.0.0"></script>
+</body>
+</html>
