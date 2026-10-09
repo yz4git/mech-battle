@@ -1,5 +1,16 @@
 import * as T from '../vendor/three.module.min.js';
 
+// Remove rigid helper pivots before batching; keep every gameplay joint intact.
+export function flattenRigidGroups(parent){
+  for(const child of [...parent.children])if(child.isGroup){
+    flattenRigidGroups(child);
+    if(child.userData.articulated)continue;
+    child.updateMatrix();
+    for(const object of [...child.children]){object.applyMatrix4(child.matrix);parent.add(object);}
+    parent.remove(child);
+  }
+}
+
 // Keep articulated groups, weapon pivots and transparent effects independent.
 // Merge only rigid siblings sharing one material, reducing mobile draw calls.
 export function batchRigidMeshes(group){

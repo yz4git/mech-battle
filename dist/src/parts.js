@@ -1,6 +1,6 @@
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 export const MAKERS = [
-  {id:'KAS',name:'カサネ重工',color:0x8d9a8a,accent:0xffbd69,shape:0,hp:1.08,weight:1.05,precision:1.0,power:1.0,tech:1.0,desc:'堅実な装甲と扱いやすい制御系'},
+  {id:'KAS',name:'カサネ重工',color:0x9ca4a7,accent:0xffbd69,shape:0,hp:1.08,weight:1.05,precision:1.0,power:1.0,tech:1.0,desc:'堅実な装甲と扱いやすい制御系'},
   {id:'VLT',name:'ヴォルト工廠',color:0x677b93,accent:0x7fcfff,shape:1,hp:.91,weight:.89,precision:1.08,power:.97,tech:1.1,desc:'軽量・高精度。電力効率を重視'},
   {id:'GRM',name:'グリム鉄鋼',color:0x8d7966,accent:0xff9b5d,shape:2,hp:1.18,weight:1.2,precision:.92,power:1.14,tech:.91,desc:'重量と引き換えに耐久と火力を確保'},
   {id:'SEN',name:'センドウ機械',color:0xa9a9a2,accent:0x9ff5da,shape:3,hp:.96,weight:.96,precision:1.13,power:.96,tech:1.06,desc:'精密照準と安定した冷却性能'},

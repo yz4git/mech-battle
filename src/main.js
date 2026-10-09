@@ -1,10 +1,10 @@
-import {PARTS,MAKERS,FAMILIES,RARITIES,RARITY_COLORS,SLOT_DEFS,TACTICS,TARGETS,SECTORS,getPart,accepts,statsFor,missionInfo,enemyLoadout,VERSION} from './parts.js?v=1.1.0';
-import {createBattle,tick,fastForward} from './simulation.js?v=1.1.0';
-import {loadState,normalizeState,persist,unlockedMission,shopOffers,settleBattle} from './state.js?v=1.1.0';
-import {MechScene,PAINTS} from './renderer.js?v=1.1.0';
-import {analyzeBuild} from './build-analysis.js?v=1.1.0';
-import {fittingPanel,buildBrief,diagnosticPanel,debrief,weaponStatus} from './ui-components.js?v=1.1.0';
-import {BattleAudio} from './audio.js?v=1.1.0';
+import {PARTS,MAKERS,FAMILIES,RARITIES,RARITY_COLORS,SLOT_DEFS,TACTICS,TARGETS,SECTORS,getPart,accepts,statsFor,missionInfo,enemyLoadout,VERSION} from './parts.js?v=1.2.0';
+import {createBattle,tick,fastForward} from './simulation.js?v=1.2.0';
+import {loadState,normalizeState,persist,unlockedMission,shopOffers,settleBattle} from './state.js?v=1.2.0';
+import {MechScene,PAINTS} from './renderer.js?v=1.2.0';
+import {analyzeBuild} from './build-analysis.js?v=1.2.0';
+import {fittingPanel,buildBrief,diagnosticPanel,debrief,weaponStatus} from './ui-components.js?v=1.2.0';
+import {BattleAudio} from './audio.js?v=1.2.0';
 
 const $=q=>document.querySelector(q),escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=n=>Math.round(n).toLocaleString('ja-JP'),signed=n=>(n>0?'+':'')+(Number.isInteger(n)?n:n.toFixed(1));

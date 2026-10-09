@@ -1,4 +1,4 @@
-import {getPart,statsFor} from './parts.js?v=1.1.0';
+import {getPart,statsFor} from './parts.js?v=1.2.0';
 
 // Estimates deliberately exclude range, enemy armor and maneuvering.
 export function analyzeBuild(build,tactic='balanced'){

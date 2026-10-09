@@ -1,5 +1,5 @@
-import {PARTS,getPart,partId,FAMILIES,SLOT_DEFS,accepts,starterLoadout,missionInfo} from './parts.js?v=1.1.0';
-import {rngFrom} from './simulation.js?v=1.1.0';
+import {PARTS,getPart,partId,FAMILIES,SLOT_DEFS,accepts,starterLoadout,missionInfo} from './parts.js?v=1.2.0';
+import {rngFrom} from './simulation.js?v=1.2.0';
 export const SAVE_KEY='mech-battle-iron-salvage-v1';
 export function newState(){const inventory=FAMILIES.map(f=>partId(f.id));for(const f of ['striker','scope','reverse','fusion','rifle','sword','laser','composite'])inventory.push(partId(f,1,1));return {
   schema:1,name:'CINDER-01',credits:1800,inventory:[...new Set(inventory)],build:starterLoadout(),presets:[null,null,null],

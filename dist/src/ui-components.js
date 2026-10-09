@@ -1,5 +1,5 @@
-import {getPart,MAKERS,SLOT_DEFS,TACTICS} from './parts.js?v=1.1.0';
-import {analyzeBuild,compareBuild,combatAdvice} from './build-analysis.js?v=1.1.0';
+import {getPart,MAKERS,SLOT_DEFS,TACTICS} from './parts.js?v=1.2.0';
+import {analyzeBuild,compareBuild,combatAdvice} from './build-analysis.js?v=1.2.0';
 const value=n=>Number.isInteger(n)?n.toLocaleString('ja-JP'):n.toFixed(1);
 export function fittingPanel(build,slot,id){
   if(!id)return '';
