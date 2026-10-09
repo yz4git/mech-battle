@@ -1,7 +1,7 @@
 import * as T from '../vendor/three.module.min.js';
-import {MAKERS} from './parts.js?v=1.2.0';
-import {palette} from './mech-surface.js?v=1.2.0';
-import {panel,block,cyl,ring,bolts,vent,light,decal} from './mech-geometry.js?v=1.2.0';
+import {MAKERS} from './parts.js?v=1.3.0';
+import {palette} from './mech-surface.js?v=1.3.0';
+import {panel,block,cyl,ring,bolts,vent,light,decal} from './mech-geometry.js?v=1.3.0';
 
 export function makeWeapon(parent,p,accent){
   const g=new T.Group();parent.add(g);if(!p)return g;

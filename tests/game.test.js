@@ -80,3 +80,37 @@ test('a damaged primary save falls back to the last valid backup',async()=>{
     assert.equal(persist(recovered),true);assert.equal(loadState().credits,2345);
   }finally{if(old===undefined)delete globalThis.localStorage;else globalThis.localStorage=old;}
 });
+
+test('weapon comparison exposes DPS, fire interval and heat tradeoffs without changing the build',async()=>{
+  const {compareWeapon}=await import('../src/build-analysis.js');
+  const build=starterLoadout(),saved={...build},c=compareWeapon(build,'weaponR',partId('machinegun'));
+  const row=key=>c.rows.find(r=>r.key===key);
+  assert.equal(c.current.id,build.weaponR);
+  assert.equal(row('damage').trend,-1);
+  assert.equal(row('dps').trend,1);
+  assert.equal(row('interval').trend,1);
+  assert.equal(row('heat').trend,-1);
+  assert.equal(row('energy').trend,-1);
+  assert.deepEqual(build,saved);
+});
+test('unlimited ammo and an empty shoulder slot have meaningful comparison values',async()=>{
+  const {compareWeapon}=await import('../src/build-analysis.js');
+  const build=starterLoadout(),laser=partId('laser');
+  const infinite=compareWeapon(build,'weaponR',laser).rows.find(r=>r.key==='ammo');
+  assert.equal(infinite.after,Infinity);assert.equal(infinite.trend,1);
+  const same=compareWeapon({...build,weaponR:laser},'weaponR',laser);
+  assert.ok(same.rows.every(r=>r.delta===0&&r.trend===0));
+  const empty=compareWeapon({...build,shoulderR:null},'shoulderR',partId('cannon'));
+  assert.equal(empty.current,undefined);assert.ok(empty.rows.every(r=>r.before===null&&r.delta===null));
+});
+test('weapon comparison only selects compatible hands or shoulders and honors the selected side',async()=>{
+  const {compareWeapon,weaponSlot}=await import('../src/build-analysis.js');
+  const build=starterLoadout(),rifle=partId('rifle'),missile=partId('missile');
+  assert.equal(weaponSlot(build,rifle,'body'),'weaponR');
+  assert.equal(weaponSlot(build,rifle,'weaponL'),'weaponL');
+  assert.equal(weaponSlot(build,missile,'weaponR'),'shoulderL');
+  assert.equal(weaponSlot(build,missile,'shoulderR'),'shoulderR');
+  assert.equal(compareWeapon(build,'weaponL',missile),null);
+  assert.equal(compareWeapon(build,'shoulderL',rifle),null);
+  assert.equal(compareWeapon(build,'weaponL',rifle).current.kind,'sword');
+});

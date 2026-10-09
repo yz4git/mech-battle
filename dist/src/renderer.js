@@ -1,9 +1,10 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.2.0';
-import {COVERS} from './simulation.js?v=1.2.0';
-import {batchRigidMeshes} from './mesh-batch.js?v=1.2.0';
-import {createMech} from './mech-model.js?v=1.2.0';
-import {SoftwareRenderer} from './software-renderer.js?v=1.2.0';
+import {getPart,MAKERS} from './parts.js?v=1.3.0';
+import {COVERS} from './simulation.js?v=1.3.0';
+import {batchRigidMeshes} from './mesh-batch.js?v=1.3.0';
+import {createMech} from './mech-model.js?v=1.3.0';
+import {SoftwareRenderer} from './software-renderer.js?v=1.3.0';
+import {CombatEffects} from './combat-effects.js?v=1.3.0';
 
 const geometries=new Map(),materials=new Map();
 const dark=0x20272a,joint=0x11191d,steel=0x79848a;
@@ -36,7 +37,7 @@ function groundTexture(theme){const canvas=document.createElement('canvas');canv
 function floorMark(parent,text,x,z,width=5){const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const ctx=canvas.getContext('2d');ctx.fillStyle='#bec2a7';ctx.font='bold 95px monospace';ctx.textAlign='center';ctx.fillText(text,256,98);const texture=new T.CanvasTexture(canvas);const m=new T.Mesh(new T.PlaneGeometry(width,width/4),new T.MeshBasicMaterial({map:texture,transparent:true,opacity:.38,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.set(x,.018,z);parent.add(m);}
 export class MechScene{
   constructor(holder){
-    this.holder=holder;this.tags=[];this.popups=[];this.feedback=document.createElement('div');this.feedback.className='combat-feedback';this.feedback.setAttribute('aria-hidden','true');holder.append(this.feedback);this.time=0;this.mode='hangar';this.angle=.52;this.zoom=1;this.shake=0;this.reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;this.drag=false;this.cameraMode=0;this.effects=[];this.projectiles=new Map();this.unitModels=[];this.dirty=true;this.lastSoftwareFrame=0;this.lastBattleTime=-1;
+    this.holder=holder;this.tags=[];this.popups=[];this.feedback=document.createElement('div');this.feedback.className='combat-feedback';this.feedback.setAttribute('aria-hidden','true');holder.append(this.feedback);this.time=0;this.mode='hangar';this.angle=.52;this.zoom=1;this.shake=0;this.reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;this.drag=false;this.cameraMode=0;this.projectiles=new Map();this.unitModels=[];this.dirty=true;this.lastSoftwareFrame=0;this.lastBattleTime=-1;
     try{this.renderer=new T.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});}catch{this.renderer=new SoftwareRenderer();}
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.65));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFSoftShadowMap;
     this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.13;
@@ -49,6 +50,7 @@ export class MechScene{
       const faces=Array.from({length:6},(_,i)=>{const c=document.createElement('canvas');c.width=c.height=64;const ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,0,64);g.addColorStop(0,i===2?'#d6dad0':'#536877');g.addColorStop(.45,'#20333e');g.addColorStop(1,'#0d171f');ctx.fillStyle=g;ctx.fillRect(0,0,64,64);ctx.fillStyle='#d0d6ce';ctx.fillRect(10,8,42,5);return c;});const envMap=new T.CubeTexture(faces);envMap.colorSpace=T.SRGBColorSpace;envMap.needsUpdate=true;this.scene.environment=envMap;this.scene.environmentIntensity=.65;
     }
     this.environment=new T.Group();this.scene.add(this.environment);this.makeEnvironment('hangar');
+    this.fx=new CombatEffects(this.scene,holder,{software:this.renderer instanceof SoftwareRenderer,reducedMotion:this.reducedMotion});
     window.addEventListener('mech-material-ready',()=>{this.dirty=true;});
     this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(holder);this.resize();
     const canvas=this.renderer.domElement;canvas.style.touchAction='none';canvas.addEventListener('wheel',e=>{if(this.mode!=='hangar')return;e.preventDefault();this.zoom=Math.max(.72,Math.min(1.35,this.zoom+e.deltaY*.001));this.dirty=true;},{passive:false});
@@ -59,7 +61,7 @@ export class MechScene{
   }
   resize(){const w=this.holder.clientWidth,h=this.holder.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();this.dirty=true;}
   clearEnvironment(){const sharedGeometry=new Set(geometries.values()),sharedMaterial=new Set(materials.values());this.environment.traverse(obj=>{if(!obj.isMesh)return;if(!sharedGeometry.has(obj.geometry))obj.geometry.dispose();if(!sharedMaterial.has(obj.material)&&!obj.material.userData.shared){obj.material.map?.dispose();obj.material.dispose();}});this.environment.clear();}
-  makeEnvironment(theme){if(this.theme===theme)return;this.theme=theme;this.clearEnvironment();const env=this.environment;
+  makeEnvironment(theme){if(this.theme===theme)return;this.theme=theme;this.clearEnvironment();this.perimeter=[];const env=this.environment;
     this.scene.background.setHex(theme==='hangar'?0x10171c:theme==='desert'?0x6f6559:theme==='snow'?0x778a92:0x34434a);this.scene.fog.color.copy(this.scene.background);this.scene.fog.near=theme==='hangar'?27:50;this.scene.fog.far=theme==='hangar'?85:145;
     const floor=new T.Mesh(new T.PlaneGeometry(110,110,22,22),new T.MeshStandardMaterial({map:groundTexture(theme),roughness:.94,metalness:.15}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;env.add(floor);
     if(theme==='hangar'){
@@ -97,9 +99,10 @@ export class MechScene{
         box(env,3.5,h,4.5,x,h/2,z,color,.03);box(env,3.65,.2,4.6,x,h+.1,z,dark,.03);for(let j=0;j<3;j++)lit(env,.35,.15,.025,x-1+j,2+(i%3)*.5,z+2.27,0x7094a1);
       }
       for(const side of [-1,1]){
-        box(env,.35,8,24,side*23,4,0,0x2b3b42);for(let j=-2;j<=2;j++){cylinder(env,.18,9,side*23.5,5,j*8,steel);lit(env,.12,.2,.2,side*22.4,3.6,j*8,0xd8ab64);}
-        if(theme==='dock'){box(env,.45,18,.6,side*20,9,-17,0x786c50);box(env,11,.45,.6,side*17,17,-17,0x786c50);box(env,.12,9,.12,side*13,12.5,-17,steel);}
-        if(theme==='power')for(let j=0;j<3;j++){cylinder(env,1.2,8,side*21,4,-13+j*9,dark);lit(env,.1,6,.1,side*19.8,4,-13+j*9,0x73dadf);}
+        const edge=new T.Group();env.add(edge);this.perimeter.push({side,group:edge});
+        box(edge,.35,8,24,side*23,4,0,0x2b3b42);for(let j=-2;j<=2;j++){cylinder(edge,.18,9,side*23.5,5,j*8,steel);lit(edge,.12,.2,.2,side*22.4,3.6,j*8,0xd8ab64);}
+        if(theme==='dock'){box(edge,.45,18,.6,side*20,9,-17,0x786c50);box(edge,11,.45,.6,side*17,17,-17,0x786c50);box(edge,.12,9,.12,side*13,12.5,-17,steel);}
+        if(theme==='power')for(let j=0;j<3;j++){cylinder(edge,1.2,8,side*21,4,-13+j*9,dark);lit(edge,.1,6,.1,side*19.8,4,-13+j*9,0x73dadf);}
       }
       for(const z of [-18,18]){box(env,36,.2,.3,0,.1,z,0x8e846b);for(let x=-16;x<=16;x+=2)box(env,.8,.015,.32,x,.011,z>0?16:-16,0xa49e85,.01);}
       floorMark(env,'SECTOR / 07',0,0,7);
@@ -119,46 +122,40 @@ export class MechScene{
   setMission(build,enemy,theme,paint=0){this.mode='mission';this.makeEnvironment(theme);this.setModels([build,enemy],paint);this.unitModels[0].position.set(-4,0,-5);this.unitModels[0].rotation.y=.32;this.unitModels[1].position.set(4,0,5);this.unitModels[1].rotation.y=Math.PI+.32;this.clearEffects();}
   setBattle(b,paint=0){this.mode='battle';this.makeEnvironment(b.info.theme);this.setModels(b.units.map(u=>u.build),paint);this.clearEffects();this.battle=b;this.tags=b.units.map(u=>{const el=document.createElement('span');el.className=`unit-tag ${u.id?'hostile':'friendly'}`;el.textContent=u.id?'敵機':'自機';this.feedback.append(el);return el;});}
   setModels(builds,paint){this.unitModels.forEach(m=>{this.scene.remove(m);m.userData.materials?.forEach(x=>x.dispose());m.traverse(o=>{if(o.isMesh&&(o.geometry.type==='PlaneGeometry'||o.geometry.userData.owned))o.geometry.dispose();if(o.isMesh&&o.material.transparent&&!o.material.userData.shared)o.material.dispose();});});this.unitModels=builds.map((b,i)=>{const m=makeMech(b,i===0?paint:0,i!==0,this.renderer instanceof SoftwareRenderer&&this.mode!=='hangar');this.scene.add(m);return m;});this.dirty=true;}
-  clearEffects(){this.tags=[];this.popups=[];this.feedback.replaceChildren();for(const e of this.effects){this.scene.remove(e.mesh);if(e.mesh.material?.transparent)e.mesh.material.dispose();}this.effects=[];for(const mesh of this.projectiles.values()){this.scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();}this.projectiles.clear();}
-  burst(x,z,big=false,color=0xffad59){
-    for(let i=0;i<(big?26:6);i++){
-      const isSmoke=big&&i>15,key=isSmoke?'smoke':'spark';if(!geometries.has(key))geometries.set(key,new T.IcosahedronGeometry(1,0));
-      const material=isSmoke?new T.MeshBasicMaterial({color:0x3e4547,transparent:true,opacity:.5,depthWrite:false}):new T.MeshBasicMaterial({color,transparent:true,opacity:1,depthWrite:false,blending:T.AdditiveBlending});
-      const mesh=new T.Mesh(geometries.get(key),material),angle=i*2.399;mesh.position.set(x,big?2.5:2+Math.sin(i)*.5,z);mesh.scale.setScalar(isSmoke?.5:big?.15:.055);this.scene.add(mesh);
-      this.effects.push({mesh,life:isSmoke?2.5:big?1.1:.45,total:isSmoke?2.5:big?1.1:.45,vx:Math.sin(angle)*(big?5:2),vz:Math.cos(angle)*(big?5:2),vy:big?2+i%4:1,smoke:isSmoke});
+  clearEffects(){this.tags=[];this.popups=[];this.feedback.replaceChildren();this.fx.reset();for(const mesh of this.projectiles.values()){this.scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();}this.projectiles.clear();}
+  consumeEvents(events){
+    this.fx.consume(events,this.unitModels,this.battle);
+    for(const e of events){
+      if(e.type==='hit'){const big=e.kind==='cannon'||e.kind==='missile';this.shake=Math.min(2.4,this.shake+(big?.7:.1));this.popup(e,`${e.amount}`,e.unit===0?'received':'damage');}
+      if(e.type==='fire'&&(e.kind==='cannon'||e.kind==='railgun'))this.shake=Math.max(this.shake,.3);
+      if(e.type==='destroy'||e.type==='break'){this.shake=e.type==='destroy'?2.5:1.4;this.popup(e,e.type==='destroy'?'CORE DESTROYED':({armL:'LEFT ARM LOST',armR:'RIGHT ARM LOST',legs:'LEGS DISABLED'}[e.slot]),'part-break');}
     }
   }
-  consumeEvents(events){for(const e of events){
-    if(e.type==='hit'){
-      const big=e.kind==='cannon'||e.kind==='missile';this.burst(e.x,e.z,big,e.kind==='laser'?0x85e9ff:0xffc285);this.shake=Math.min(2,this.shake+(big?.7:.13));
-      this.popup(e,`${e.amount}`,e.unit===0?'received':'damage');if(big)this.shockwave(e.x,e.z);
-    }
-    if(e.type==='destroy'||e.type==='break'){this.burst(e.x,e.z,true,0xff8645);this.shockwave(e.x,e.z);this.shake=2;this.popup(e,e.type==='destroy'?'CORE DESTROYED':({armL:'LEFT ARM LOST',armR:'RIGHT ARM LOST',legs:'LEGS DISABLED'}[e.slot]),'part-break');}
-    if(e.type==='fire'){
-      const model=this.unitModels[e.unit],gun=model?.userData.guns[e.slot];if(!gun)continue;model.updateMatrixWorld(true);
-      const melee=e.kind==='sword'||e.kind==='punch';const point=gun.localToWorld(gun.userData.muzzle?.clone()||new T.Vector3(0,0,melee?1.1:1.9));
-      const key=melee?'slash':'flash';if(!geometries.has(key))geometries.set(key,melee?new T.TorusGeometry(1.25,.035,4,18,2.5):new T.ConeGeometry(.16,.8,5));
-      const mesh=new T.Mesh(geometries.get(key),new T.MeshBasicMaterial({color:melee?0xa7f6ff:0xffd69a,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));mesh.position.copy(point);mesh.rotation.set(Math.PI/2,0,model.rotation.y);this.scene.add(mesh);this.effects.push({mesh,life:melee?.24:.12,total:melee?.24:.12,vx:0,vy:0,vz:0,flash:true});
-    }
-  }}
   popup(e,text,kind){if(this.popups.length>=14){this.popups.shift().el.remove();}const el=document.createElement('span');el.className=`combat-number ${kind}`;el.textContent=text;this.feedback.append(el);this.popups.push({el,x:e.x,z:e.z,life:1.1,total:1.1,y:kind==='part-break'?5.3:3.5});}
-  shockwave(x,z){if(!geometries.has('wave'))geometries.set('wave',new T.TorusGeometry(1,.035,3,24));const mesh=new T.Mesh(geometries.get('wave'),new T.MeshBasicMaterial({color:0xffb971,transparent:true,opacity:.6,depthWrite:false}));mesh.rotation.x=-Math.PI/2;mesh.position.set(x,.15,z);this.scene.add(mesh);this.effects.push({mesh,life:.45,total:.45,vx:0,vy:0,vz:0,wave:true});}
 
   animateMech(model,u,dt){
     const d=model.userData;
     for(const m of d.materials||[]){m.emissive.copy(m.userData.baseEmissive);m.emissiveIntensity=m.userData.baseIntensity;if(u?.armorFlash>0){m.emissive.setHex(0xff6f32);m.emissiveIntensity=.6;}}
     if(u){model.position.set(u.x,0,u.z);model.rotation.y=u.yaw;model.rotation.z=u.dead?Math.min(.65,(this.time-(model.userData.deathAt??=this.time))*.5):0;
       model.position.y=u.dead?-.2:0;d.torso.rotation.z=u.stun>0?Math.sin(this.time*35)*.04:0;
-      for(const slot of ['weaponL','weaponR'])if(d.guns[slot])d.guns[slot].rotation.x=0;
+      for(const [slot,gun] of Object.entries(d.guns)){
+        gun.userData.restZ??=gun.position.z;gun.position.z=gun.userData.restZ-(getPart(u.build[slot])?.melee?0:Math.min(1,(u.firePose[slot]||0)/.18)*.15);
+        if(slot==='weaponL'||slot==='weaponR')gun.rotation.x=0;
+      }
       d.arms.armL.visible=u.health.armL>0;d.arms.armR.visible=u.health.armR>0;
       d.walkPhase=(d.walkPhase||0)+dt*u.move*2.7;const step=d.walkPhase;d.legs.forEach((leg,i)=>leg.rotation.x=u.health.legs<=0?-.15:Math.sin(step+i*Math.PI)*(u.move>0?.24:.008));
       d.torso.position.y=d.cy+(u.move>0&&!d.tank?Math.abs(Math.sin(step))*.09:0);d.torso.rotation.x=u.boost>0?.1:0;
       for(const [slot,arm] of [['weaponL',d.arms.armL],['weaponR',d.arms.armR]]){
         const p=getPart(u.build[slot]),pose=u.firePose[slot]||0;
-        arm.rotation.x=p.melee?(p.id.includes('-VB-')?-.45-Math.sin((.42-pose)/.42*Math.PI)*1.25:-Math.sin(pose/.42*Math.PI)*1.3):-.12+(pose>0?.13:0);
+        const target=this.battle?.units[1-u.id],range=target?Math.hypot(target.x-u.x,target.z-u.z):15,targetHeight=this.unitModels[1-u.id]?.userData.cy||d.cy;
+        const aim=-Math.atan2(targetHeight-(d.cy-1.62),Math.max(2,range));
+        arm.rotation.x=p.melee?(p.id.includes('-VB-')?-.45-Math.sin((.42-pose)/.42*Math.PI)*1.25:-Math.sin(pose/.42*Math.PI)*1.3):aim+(pose>0?.045:0);
         arm.rotation.z=p.melee&&pose>0?(slot==='weaponL'?1:-1)*Math.sin(pose/.42*Math.PI)*.65:(slot==='weaponL'?.03:-.03);
       }
-      for(const slot of ['shoulderL','shoulderR'])if(d.shoulders[slot])d.shoulders[slot].rotation.x=(u.firePose[slot]||0)>0?-.16:0;
+      for(const slot of ['shoulderL','shoulderR'])if(d.shoulders[slot]){
+        const target=this.battle?.units[1-u.id],range=target?Math.hypot(target.x-u.x,target.z-u.z):15,height=this.unitModels[1-u.id]?.userData.cy||d.cy;
+        d.shoulders[slot].rotation.x=Math.atan2(d.cy+1.18-height,Math.max(2,range))+((u.firePose[slot]||0)>0?-.06:0);
+      }
       d.jets.forEach(j=>{j.visible=u.boost>0;j.scale.y=1+Math.sin(this.time*55)*.22;});
     }else{
       d.torso.position.y=d.cy+Math.sin(this.time*1.4)*.009;d.arms.armL.rotation.x=-.035;d.arms.armR.rotation.x=-.035;
@@ -167,24 +164,29 @@ export class MechScene{
   }
   render(dt,b=null){if(this.contextLost||dt===0&&!this.dirty)return;const frozen=dt===0;this.time+=dt;
     const software=this.renderer instanceof SoftwareRenderer;
-    if(software){const now=performance.now();if(now-this.lastSoftwareFrame<130)return;if(this.mode!=='battle'&&!this.dirty)return;if(this.mode==='battle'&&b?.time===this.lastBattleTime&&!this.effects.length&&!this.dirty)return;dt=frozen?0:Math.min(.2,(now-this.lastSoftwareFrame)/1000||dt);this.lastSoftwareFrame=now;this.lastBattleTime=b?.time;}
+    if(software){const now=performance.now();if(now-this.lastSoftwareFrame<130)return;if(this.mode!=='battle'&&!this.dirty)return;if(this.mode==='battle'&&b?.time===this.lastBattleTime&&!this.fx.active()&&!this.popups.length&&!this.dirty)return;dt=frozen?0:Math.min(.2,(now-this.lastSoftwareFrame)/1000||dt);this.lastSoftwareFrame=now;this.lastBattleTime=b?.time;}
     this.unitModels.forEach((m,i)=>this.animateMech(m,this.mode==='battle'?b?.units[i]:null,dt));
     if(this.mode==='battle'&&b){
       const ids=new Set(b.projectiles.map(p=>p.id));for(const [id,m]of this.projectiles)if(!ids.has(id)){this.scene.remove(m);m.geometry.dispose();m.material.dispose();this.projectiles.delete(id);}
-      for(const p of b.projectiles){let m=this.projectiles.get(p.id);if(!m){const beam=p.kind==='laser'||p.kind==='railgun';m=new T.Mesh(beam?new T.CylinderGeometry(p.kind==='laser'?.034:.055,p.kind==='laser'?.034:.055,1,5):p.kind==='missile'?new T.ConeGeometry(.11,.55,6):new T.CylinderGeometry(p.kind==='cannon'?.065:.028,p.kind==='cannon'?.065:.028,.85,4),new T.MeshBasicMaterial({color:p.kind==='laser'?0x82e9ff:p.kind==='railgun'?0xb0dfff:0xffcc7b}));const gun=this.unitModels[p.from]?.userData.guns[p.sourceSlot];if(gun){gun.updateWorldMatrix(true,false);m.userData.origin=gun.localToWorld(gun.userData.muzzle?.clone()||new T.Vector3(0,0,2));}else m.userData.origin=new T.Vector3(p.ax,2.3,p.az);this.scene.add(m);this.projectiles.set(p.id,m);}
-        if(p.kind==='laser'||p.kind==='railgun'){const a=m.userData.origin.clone(),end=p.kind==='laser'?new T.Vector3(p.tx,2.2,p.tz):a.clone().lerp(new T.Vector3(p.tx,2.2,p.tz),1-p.life/p.total),delta=end.clone().sub(a);m.position.copy(a.add(end).multiplyScalar(.5));m.scale.y=delta.length();m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),delta.normalize());}
-        else{
-          const t=1-p.life/p.total,origin=m.userData.origin;m.position.copy(origin).lerp(new T.Vector3(p.tx,2.2,p.tz),t);if(p.kind==='missile')m.position.y+=Math.sin(t*Math.PI)*3.7;
-          m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),new T.Vector3(p.tx-p.ax,p.kind==='missile'?Math.cos(t*Math.PI)*3.7*Math.PI:0,p.tz-p.az).normalize());
-          if(p.kind==='missile'&&this.time-(m.userData.lastSmoke||0)>.1){m.userData.lastSmoke=this.time;if(!geometries.has('trail'))geometries.set('trail',new T.IcosahedronGeometry(.13,0));const puff=new T.Mesh(geometries.get('trail'),new T.MeshBasicMaterial({color:0xb7b7a7,transparent:true,opacity:.5,depthWrite:false}));puff.position.copy(m.position);this.scene.add(puff);this.effects.push({mesh:puff,life:.65,total:.65,vx:0,vz:0,vy:.25,smoke:true});}
+      for(const p of b.projectiles){
+        // Energy weapons already have a core + halo beam in the effects pool.
+        if(p.kind==='laser'||p.kind==='railgun')continue;
+        let m=this.projectiles.get(p.id);
+        if(!m){
+          m=new T.Mesh(p.kind==='missile'?new T.ConeGeometry(.11,.55,6):new T.CylinderGeometry(p.kind==='cannon'?.065:.028,p.kind==='cannon'?.065:.028,.85,4),new T.MeshBasicMaterial({color:0xffcc7b}));
+          const gun=this.unitModels[p.from]?.userData.guns[p.sourceSlot];
+          if(gun){gun.updateWorldMatrix(true,false);m.userData.origin=gun.localToWorld(gun.userData.muzzle?.clone()||new T.Vector3(0,0,2));}else m.userData.origin=new T.Vector3(p.ax,2.3,p.az);
+          this.scene.add(m);this.projectiles.set(p.id,m);
         }
+        const t=1-p.life/p.total,origin=m.userData.origin;m.position.copy(origin).lerp(new T.Vector3(p.tx,2.2,p.tz),t);if(p.kind==='missile')m.position.y+=Math.sin(t*Math.PI)*3.7;
+        m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),new T.Vector3(p.tx-p.ax,p.kind==='missile'?Math.cos(t*Math.PI)*3.7*Math.PI:0,p.tz-p.az).normalize());
+        if(p.kind==='missile'&&this.time-(m.userData.lastSmoke||0)>.055){m.userData.lastSmoke=this.time;this.fx.missileTrail(m.position);}
       }
     }
-    for(const e of this.effects){e.life-=dt;e.mesh.position.x+=e.vx*dt;e.mesh.position.z+=e.vz*dt;e.mesh.position.y+=e.vy*dt;if(!e.flash&&!e.wave)e.vy-=dt*(e.smoke?-1:6);e.mesh.material.opacity=Math.max(0,e.life/e.total)*(e.smoke?.4:1);if(e.smoke)e.mesh.scale.addScalar(dt*.8);if(e.wave)e.mesh.scale.addScalar(dt*11);}
-    this.effects=this.effects.filter(e=>{if(e.life>0)return true;this.scene.remove(e.mesh);e.mesh.material.dispose();return false;});
     let target=new T.Vector3(0,this.holder.clientHeight<380?2.3:2.5,0),r=(11.1+Math.max(0,1.3-this.camera.aspect)*3.5)*this.zoom,height=5.15,angle=this.angle;
     if(this.mode!=='hangar'){
       if(this.mode==='battle'&&b){const [a,c]=b.units;target.set((a.x+c.x)/2,1.8,(a.z+c.z)/2);const spread=Math.hypot(a.x-c.x,a.z-c.z);r=Math.max(14,spread*.58+8)+Math.max(0,1-this.camera.aspect)*4;height=this.cameraMode===1?32:Math.max(8,spread*.17+7);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI*.5+.24+this.angle-.52;
+        if(this.cameraMode===2){target.y=2.6;r=Math.max(10,spread*.48+7);height=Math.max(6.8,spread*.12+5.5);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI*.64+this.angle-.52;}
         if(this.camera.aspect<.85){target.y=.35;height=this.cameraMode===1?32:Math.max(13,r*.65);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI+Math.max(-.4,Math.min(.4,this.angle-.52));if(this.cameraMode===1){height=Math.max(35,spread*1.2+16);r=7;}}
       }
       else{target.set(0,1.4,0);r=22+Math.max(0,1-this.camera.aspect)*8;height=15;angle=this.angle+Math.PI;}
@@ -203,6 +205,8 @@ export class MechScene{
     }
     if(software)this.camera.position.copy(pos);else this.camera.position.lerp(pos,frozen?1:Math.min(1,dt*6));this.camera.lookAt(target);
     if(this.shake>0&&!this.reducedMotion&&this.mode==='battle'){this.camera.position.x+=Math.sin(this.time*91)*this.shake*.06;this.camera.position.y+=Math.cos(this.time*73)*this.shake*.04;this.shake=Math.max(0,this.shake-dt*5);}
-    this.fill.position.copy(this.camera.position);if(software){const lowCost=this.mode==='battle';if(this.renderer.lowCost!==lowCost){this.renderer.lowCost=lowCost;this.renderer.setSize(this.holder.clientWidth,this.holder.clientHeight);}this.renderer.shadowFocus.copy(target);this.renderer.shadowSpan=this.mode==='hangar'?14:52;}this.renderer.render(this.scene,this.camera);if(b&&this.mode==='battle'){const top=(this.holder.querySelector('#battle-hud')?.offsetHeight||90)+30;this.tags.forEach((el,i)=>{const u=b.units[i],p=new T.Vector3(u.x,6,u.z).project(this.camera);el.style.left=`${(p.x*.5+.5)*this.holder.clientWidth}px`;el.style.top=`${Math.max(top,(-p.y*.5+.5)*this.holder.clientHeight-18)}px`;el.style.opacity=u.dead?'0':'1';});}for(const p of this.popups){p.life-=dt;const v=new T.Vector3(p.x,p.y+(1-p.life/p.total)*1.5,p.z).project(this.camera);p.el.style.transform=`translate(-50%,-50%) translate(${(v.x*.5+.5)*this.holder.clientWidth}px,${(-v.y*.5+.5)*this.holder.clientHeight}px)`;p.el.style.opacity=String(Math.min(1,p.life*2));}this.popups=this.popups.filter(p=>{if(p.life>0)return true;p.el.remove();return false;});this.dirty=false;
+    // Hide the near perimeter when the camera crosses it; combat cover stays solid.
+    for(const edge of this.perimeter)edge.group.visible=this.mode!=='battle'||edge.side*this.camera.position.x<18;
+    this.fill.position.copy(this.camera.position);if(software){const lowCost=this.mode==='battle';if(this.renderer.lowCost!==lowCost){this.renderer.lowCost=lowCost;this.renderer.setSize(this.holder.clientWidth,this.holder.clientHeight);}this.renderer.shadowFocus.copy(target);this.renderer.shadowSpan=this.mode==='hangar'?14:52;}this.fx.update(frozen?0:dt,this.camera,this.unitModels,this.mode==='battle'?b:null);this.renderer.render(this.scene,this.camera);if(b&&this.mode==='battle'){const top=(this.holder.querySelector('#battle-hud')?.offsetHeight||90)+30;this.tags.forEach((el,i)=>{const u=b.units[i],p=new T.Vector3(u.x,6,u.z).project(this.camera);el.style.left=`${(p.x*.5+.5)*this.holder.clientWidth}px`;el.style.top=`${Math.max(top,(-p.y*.5+.5)*this.holder.clientHeight-18)}px`;el.style.opacity=u.dead?'0':'1';});}for(const p of this.popups){p.life-=dt;const v=new T.Vector3(p.x,p.y+(1-p.life/p.total)*1.5,p.z).project(this.camera);p.el.style.transform=`translate(-50%,-50%) translate(${(v.x*.5+.5)*this.holder.clientWidth}px,${(-v.y*.5+.5)*this.holder.clientHeight}px)`;p.el.style.opacity=String(Math.min(1,p.life*2));}this.popups=this.popups.filter(p=>{if(p.life>0)return true;p.el.remove();return false;});this.dirty=false;
   }
 }

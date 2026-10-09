@@ -1,10 +1,24 @@
-import {getPart,MAKERS,SLOT_DEFS,TACTICS} from './parts.js?v=1.2.0';
-import {analyzeBuild,compareBuild,combatAdvice} from './build-analysis.js?v=1.2.0';
-const value=n=>Number.isInteger(n)?n.toLocaleString('ja-JP'):n.toFixed(1);
+import {getPart,MAKERS,SLOT_DEFS,TACTICS} from './parts.js?v=1.3.0';
+import {analyzeBuild,compareBuild,combatAdvice,compareWeapon,weaponSlot} from './build-analysis.js?v=1.3.0';
+const value=n=>n===null?'—':n===Infinity?'∞':n===-Infinity?'−∞':Number.isInteger(n)?n.toLocaleString('ja-JP'):Number(n.toFixed(2)).toLocaleString('ja-JP');
+const deltaValue=r=>r.delta===null?'—':r.delta===0?'±0':r.delta===Infinity?'無限化':r.delta===-Infinity?'有限化':(r.delta>0?'+':'')+value(r.delta);
+const tone=r=>r.trend>0?'plus':r.trend<0?'minus':'unchanged';
+export function weaponComparisonPanel(build,slot,id,switchSlots=false){
+  const c=compareWeapon(build,slot,id);if(!c)return '';
+  const slots=SLOT_DEFS.filter(s=>s.type==='weapon'&&!!s.shoulder===!!c.candidate.shoulder);
+  const tags=p=>p?`${p.melee?'近接':p.shoulder?'肩武器':'手持ち'} / ${{kinetic:'実弾',thermal:'熱',explosive:'爆発'}[p.damageType]}`:'未装備';
+  return `<section class="weapon-comparison" aria-label="${c.def.name}の武器性能比較"><div class="section-label"><h3>武器性能比較</h3><span>${c.def.name}</span></div>${switchSlots?`<div class="compare-slots" aria-label="武器の交換先">${slots.map(s=>`<button class="${s.id===slot?'active':''}" data-action="compare-slot" data-id="${id}" data-slot="${s.id}" aria-pressed="${s.id===slot}">${s.name}と比較</button>`).join('')}</div>`:''}<div class="compare-identities"><div><small>現在 / ${tags(c.current)}</small><strong>${c.current?.name||'未装備'}</strong><span>${c.current?.title||'この部位に武器はありません'}</span></div><div><small>候補 / ${tags(c.candidate)}</small><strong>${c.candidate.name}</strong><span>${c.candidate.title}</span></div></div><table class="weapon-compare-table"><thead><tr><th scope="col">性能</th><th scope="col">現在</th><th scope="col">候補</th><th scope="col">差</th></tr></thead><tbody>${c.rows.map(r=>`<tr><th scope="row">${r.label}<small>${r.unit}</small></th><td>${value(r.before)}</td><td class="candidate-stat">${value(r.after)}</td><td class="${tone(r)}">${deltaValue(r)}</td></tr>`).join('')}</tbody></table><p class="comparison-note">緑は有利、赤は不利な変化。単体DPSは威力÷攻撃間隔で、命中・距離・装甲・腕の補正を含みません。弾数∞の武器も射撃電力を消費します。</p></section>`;
+}
+export function weaponSalvageSummary(build,id){
+  const slot=weaponSlot(build,id),c=compareWeapon(build,slot,id);if(!c)return '';
+  const rows=c.rows.filter(r=>['damage','dps','range'].includes(r.key));
+  return `<span class="salvage-comparison"><small>${c.def.name} / ${c.current?.name||'未装備'} と比較</small><span>${rows.map(r=>`<i class="${tone(r)}">${r.key==='damage'?'威力':r.key==='dps'?'DPS':'射程'} ${deltaValue(r)}</i>`).join('')}</span></span>`;
+}
 export function fittingPanel(build,slot,id){
   if(!id)return '';
   const p=getPart(id),s=analyzeBuild({...build,[slot]:id}),rows=compareBuild(build,slot,id);
-  return `<div class="fitting-panel" role="region" aria-label="試着中の性能比較"><div class="fitting-heading"><div><small>FITTING / ${SLOT_DEFS.find(s=>s.id===slot).name}</small><strong>${p.name} <span>${p.title}</span></strong></div><button class="close-button" data-action="cancel-fit" aria-label="試着をやめる">×</button></div><div class="comparison-grid">${rows.map(r=>`<div><small>${r.label}</small><b>${value(r.after)} <i>${r.unit}</i></b><span class="${r.delta*r.better>0?'plus':r.delta*r.better<0?'minus':'unchanged'}">${r.delta?(r.delta>0?'+':'')+value(r.delta):'±0'}</span></div>`).join('')}</div>${s.stats.overweight||s.stats.underpowered?'<p class="fit-warning">積載・電力に注意。この構成では性能が低下します。</p>':''}<div class="fitting-actions"><span>現在の装備との差</span><button class="button primary" data-action="apply-fit">このパーツを装備</button></div></div>`;
+  const machine=`<div class="comparison-grid">${rows.map(r=>`<div><small>${r.label}</small><b>${value(r.after)} <i>${r.unit}</i></b><span class="${r.delta*r.better>0?'plus':r.delta*r.better<0?'minus':'unchanged'}">${r.delta?(r.delta>0?'+':'')+value(r.delta):'±0'}</span></div>`).join('')}</div>`;
+  return `<div class="fitting-panel" role="region" aria-label="試着中の性能比較"><div class="fitting-heading"><div><small>FITTING / ${SLOT_DEFS.find(s=>s.id===slot).name}</small><strong>${p.name} <span>${p.title}</span></strong></div><button class="close-button" data-action="cancel-fit" aria-label="試着をやめる">×</button></div>${p.type==='weapon'?weaponComparisonPanel(build,slot,id)+`<details class="machine-comparison"><summary>機体全体への影響</summary>${machine}</details>`:machine}${s.stats.overweight||s.stats.underpowered?'<p class="fit-warning">積載・電力に注意。この構成では性能が低下します。</p>':''}<div class="fitting-actions"><span>現在の装備との差</span><button class="button primary" data-action="apply-fit">このパーツを装備</button></div></div>`;
 }
 export function buildBrief(build,tactic){
   const a=analyzeBuild(build,tactic),s=a.stats;

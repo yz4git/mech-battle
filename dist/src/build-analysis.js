@@ -1,4 +1,36 @@
-import {getPart,statsFor} from './parts.js?v=1.2.0';
+import {getPart,statsFor,SLOT_DEFS,accepts} from './parts.js?v=1.3.0';
+
+export function weaponSlot(build,id,preferred){
+  const p=getPart(id),slots=SLOT_DEFS.filter(s=>s.type==='weapon'&&accepts(s,p));
+  return slots.find(s=>s.id===preferred)?.id||slots.find(s=>s.id==='weaponR')?.id||slots[0]?.id||null;
+}
+
+export function compareWeapon(build,slot,id){
+  const def=SLOT_DEFS.find(s=>s.id===slot),candidate=getPart(id);
+  if(!def||def.type!=='weapon'||!accepts(def,candidate))return null;
+  const current=getPart(build[slot]);
+  const metrics=[
+    ['damage','威力',p=>p.damage,1,''],
+    ['dps','単体DPS',p=>p.damage/p.interval,1,'/s'],
+    ['range','最大射程',p=>p.range,1,'m'],
+    ['minRange','最短射程',p=>p.minRange,-1,'m'],
+    ['interval','攻撃間隔',p=>p.interval,-1,'s'],
+    ['accuracy','基礎命中',p=>p.accuracy*100,1,'%'],
+    ['stagger','衝撃',p=>p.stagger,1,''],
+    ['weight','重量',p=>p.weight,-1,'t'],
+    ['heat','発熱 / 秒',p=>p.heat/p.interval,-1,''],
+    ['energy','射撃電力 / 秒',p=>p.energyShot/p.interval,-1,''],
+    ['draw','装備消費電力',p=>p.draw||0,-1,''],
+    ['ammo','弾数',p=>p.ammo||Infinity,1,'']
+  ];
+  const rows=metrics.map(([key,label,read,better,unit])=>{
+    const before=current?read(current):null,after=read(candidate);
+    const delta=before===null?null:after===before?0:after-before;
+    const trend=delta===null||delta===0?0:Math.sign(delta)*better;
+    return {key,label,before,after,delta,trend,unit};
+  });
+  return {slot,def,current,candidate,rows};
+}
 
 // Estimates deliberately exclude range, enemy armor and maneuvering.
 export function analyzeBuild(build,tactic='balanced'){
