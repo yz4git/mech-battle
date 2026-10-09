@@ -1,5 +1,5 @@
-import {PARTS,getPart,partId,FAMILIES,SLOT_DEFS,accepts,starterLoadout,missionInfo} from './parts.js?v=1.0.0';
-import {rngFrom} from './simulation.js?v=1.0.0';
+import {PARTS,getPart,partId,FAMILIES,SLOT_DEFS,accepts,starterLoadout,missionInfo} from './parts.js?v=1.1.0';
+import {rngFrom} from './simulation.js?v=1.1.0';
 export const SAVE_KEY='mech-battle-iron-salvage-v1';
 export function newState(){const inventory=FAMILIES.map(f=>partId(f.id));for(const f of ['striker','scope','reverse','fusion','rifle','sword','laser','composite'])inventory.push(partId(f,1,1));return {
   schema:1,name:'CINDER-01',credits:1800,inventory:[...new Set(inventory)],build:starterLoadout(),presets:[null,null,null],
@@ -27,8 +27,19 @@ export function normalizeState(raw){
   state.pending=null;state.lastResult=null;
   return state;
 }
-export function loadState(){try{const raw=localStorage.getItem(SAVE_KEY);if(raw){const parsed=JSON.parse(raw),state=normalizeState(parsed);state.lastResult=parsed.lastResult&&typeof parsed.lastResult==='object'?parsed.lastResult:null;return state;}}catch{}return newState();}
-export function persist(state){try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));return true;}catch{return false;}}
+export function loadState(){
+  for(const key of [SAVE_KEY,`${SAVE_KEY}-backup`]){
+    try{const raw=localStorage.getItem(key);if(raw)return normalizeState(JSON.parse(raw));}catch{}
+  }
+  return newState();
+}
+export function persist(state){
+  try{
+    const old=localStorage.getItem(SAVE_KEY);
+    if(old){try{normalizeState(JSON.parse(old));localStorage.setItem(`${SAVE_KEY}-backup`,old);}catch{}}
+    localStorage.setItem(SAVE_KEY,JSON.stringify(state));return true;
+  }catch{return false;}
+}
 export function unlockedMission(state){let i=0;while(i<39&&state.completed.includes(i))i++;return i;}
 export function shopOffers(state){
   const random=rngFrom(state.shopSeed),rank=Math.min(8,Math.floor(unlockedMission(state)/5)+2);

@@ -1,4 +1,4 @@
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 export const MAKERS = [
   {id:'KAS',name:'カサネ重工',color:0x8d9a8a,accent:0xffbd69,shape:0,hp:1.08,weight:1.05,precision:1.0,power:1.0,tech:1.0,desc:'堅実な装甲と扱いやすい制御系'},
   {id:'VLT',name:'ヴォルト工廠',color:0x677b93,accent:0x7fcfff,shape:1,hp:.91,weight:.89,precision:1.08,power:.97,tech:1.1,desc:'軽量・高精度。電力効率を重視'},
@@ -98,7 +98,7 @@ export function statsFor(loadout){
   const weapons=['weaponL','weaponR','shoulderL','shoulderR'].map(slot=>({slot,part:p[slot]})).filter(x=>x.part);
   const handling=(p.armL.handling+p.armR.handling+p.body.handling)/2;
   const stability=all.reduce((n,x)=>n+(x.stability||0),0);
-  const dps=Math.round(weapons.reduce((n,w)=>n+w.part.damage/w.part.interval*w.part.accuracy,0));
+  const dps=Math.round(weapons.reduce((n,w)=>n+w.part.damage/w.part.interval*w.part.accuracy*(w.part.melee?(p[w.slot==='weaponL'?'armL':'armR'].melee||1):1),0));
   return {weight,draw,capacity,output,weightRatio,powerRatio,speed,pools,resist,weapons,handling,stability,dps,energy:p.engine.energy,cooling:p.engine.cooling,
     regen:Math.max(3,(output-draw)*.27),overweight:weightRatio>1,underpowered:powerRatio>1,
     armor:Math.round(Object.values(resist).reduce((n,r)=>n+r.kinetic+r.thermal+r.explosive,0)/12)};

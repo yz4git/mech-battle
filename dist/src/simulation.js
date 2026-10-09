@@ -1,4 +1,4 @@
-import {statsFor,getPart,missionInfo,enemyLoadout} from './parts.js?v=1.0.0';
+import {statsFor,getPart,missionInfo,enemyLoadout} from './parts.js?v=1.1.0';
 
 export function rngFrom(seed){let a=seed>>>0;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
@@ -10,7 +10,7 @@ export function createBattle(loadout,index,{seed=Date.now(),tactic='balanced',ta
   const makeUnit=(id,build,x,z,ai,aim)=>{
     const stats=statsFor(build);
     return {id,build:{...build},stats,x,z,vx:0,vz:0,yaw:id===0?0:Math.PI,health:{...stats.pools},energy:stats.energy,heat:0,stagger:0,stun:0,
-      dead:false,boost:0,move:0,tactic:ai,target:aim,firePose:{},weapons:stats.weapons.map(w=>({...w,cd:.3+random()*.8,ammo:w.part.ammo||Infinity})),damage:0,hits:0,shots:0,broken:[],armorFlash:0};
+      dead:false,boost:0,move:0,tactic:ai,target:aim,firePose:{},weapons:stats.weapons.map(w=>({...w,cd:.3+random()*.8,ammo:w.part.ammo||Infinity})),damage:0,hits:0,shots:0,broken:[],armorFlash:0,weaponReport:Object.fromEntries(stats.weapons.map(w=>[w.slot,{shots:0,hits:0,damage:0}]))};
   };
   const enemyTactic=index===0?'balanced':info.sector===5?'rush':info.sector===2?'fortress':info.sector===3?'kite':['balanced','rush','kite','fortress','balanced'][info.step];
   return {time:0,seed,index,random,units:[makeUnit(0,loadout,0,-12,tactic,target),makeUnit(1,enemy,0,12,enemyTactic,info.boss?'arms':'body')],projectiles:[],events:[],log:[],result:null,serial:0,info};
@@ -31,7 +31,7 @@ function damage(b,shooter,enemy,weapon,slot,mult=1,sourceSlot=null){
   const resist=clamp(armor?.[weapon.damageType]||0,0,48);
   const armBonus=weapon.melee?(getPart(shooter.build[sourceSlot==='weaponL'?'armL':'armR'])?.melee||1):1;
   const amount=Math.max(1,Math.round(weapon.damage*(1-resist/100)*mult*armBonus*(.9+b.random()*.2)));
-  enemy.health[slot]=Math.max(0,enemy.health[slot]-amount);shooter.damage+=amount;shooter.hits++;enemy.armorFlash=.14;
+  enemy.health[slot]=Math.max(0,enemy.health[slot]-amount);shooter.damage+=amount;shooter.hits++;if(sourceSlot&&shooter.weaponReport[sourceSlot]){shooter.weaponReport[sourceSlot].hits++;shooter.weaponReport[sourceSlot].damage+=amount;}enemy.armorFlash=.14;
   enemy.stagger+=weapon.stagger*(slot==='legs'?1.35:1);
   event(b,'hit',{unit:enemy.id,from:shooter.id,slot,amount,x:enemy.x,z:enemy.z,kind:weapon.kind});
   if(enemy.health[slot]<=0&&slot!=='body'&&!enemy.broken.includes(slot)){
@@ -82,18 +82,18 @@ function fire(b,u,enemy,dt){
     if(!p.melee&&p.kind!=='missile'&&lineBlocked(u,enemy))continue;
     if(u.energy<p.energyShot)continue;
     u.energy-=p.energyShot;u.heat+=p.heat;w.cd=p.interval*(u.stats.underpowered?1+u.stats.powerRatio*.5:1);w.ammo--;
-    u.firePose[w.slot]=p.melee?.42:.18;u.shots++;
+    u.firePose[w.slot]=p.melee?.42:.18;u.shots++;u.weaponReport[w.slot].shots++;
     let accuracy=p.accuracy+u.stats.handling*.002+(u.tactic==='fortress'?.075:0)-(u.move>0?.025:0)-(enemy.boost>0?.16:0);
     if(enemy.health.legs<=0)accuracy+=.08;
     accuracy=clamp(accuracy*(1-Math.max(0,d/p.range-.65)*.42),.15,.99);
     const slot=chooseHit(b,u,enemy),hit=b.random()<accuracy;
     event(b,'fire',{unit:u.id,slot:w.slot,kind:p.kind,x:u.x,z:u.z});
     if(p.melee){if(hit)damage(b,u,enemy,p,slot,1,w.slot);else event(b,'miss',{unit:enemy.id,x:enemy.x,z:enemy.z});}
-    else if(p.kind==='laser'){if(hit)damage(b,u,enemy,p,slot);b.projectiles.push({id:++b.serial,from:u.id,kind:p.kind,part:p,slot,x:u.x,z:u.z,ax:u.x,az:u.z,tx:enemy.x,tz:enemy.z,life:.12,total:.12,visual:true,hit});}
+    else if(p.kind==='laser'){if(hit)damage(b,u,enemy,p,slot,1,w.slot);b.projectiles.push({id:++b.serial,from:u.id,sourceSlot:w.slot,kind:p.kind,part:p,slot,x:u.x,z:u.z,ax:u.x,az:u.z,tx:enemy.x,tz:enemy.z,life:.12,total:.12,visual:true,hit});}
     else{
       const total=p.kind==='missile'?d/18:d/(p.kind==='railgun'?160:75);
       const tx=enemy.x+(p.kind==='missile'?0:enemy.vx*total),tz=enemy.z+(p.kind==='missile'?0:enemy.vz*total);
-      b.projectiles.push({id:++b.serial,from:u.id,kind:p.kind,part:p,slot,x:u.x,z:u.z,ax:u.x,az:u.z,tx:tx+(hit?0:(b.random()-.5)*5),tz:tz+(hit?0:(b.random()-.5)*5),life:total,total,hit});
+      b.projectiles.push({id:++b.serial,from:u.id,sourceSlot:w.slot,kind:p.kind,part:p,slot,x:u.x,z:u.z,ax:u.x,az:u.z,tx:tx+(hit?0:(b.random()-.5)*5),tz:tz+(hit?0:(b.random()-.5)*5),life:total,total,hit});
     }
   }
 }
@@ -107,12 +107,12 @@ export function tick(b,dt=1/30){
     p.life-=dt;const enemy=b.units[1-p.from];
     if(p.kind==='missile'){p.tx=enemy.x;p.tz=enemy.z;}
     const t=clamp(1-p.life/Math.max(.001,p.total),0,1);p.x=p.ax+(p.tx-p.ax)*t;p.z=p.az+(p.tz-p.az)*t;
-    if(p.life<=0&&!p.visual){if(p.hit&&!enemy.dead&&(p.kind==='missile'||Math.hypot(p.tx-enemy.x,p.tz-enemy.z)<2.1))damage(b,b.units[p.from],enemy,p.part,p.slot);else event(b,'miss',{unit:enemy.id,x:p.tx,z:p.tz});}
+    if(p.life<=0&&!p.visual){if(p.hit&&!enemy.dead&&(p.kind==='missile'||Math.hypot(p.tx-enemy.x,p.tz-enemy.z)<2.1))damage(b,b.units[p.from],enemy,p.part,p.slot,1,p.sourceSlot);else event(b,'miss',{unit:enemy.id,x:p.tx,z:p.tz});}
   }
   b.projectiles=b.projectiles.filter(p=>p.life>0);
   if(b.units.some(u=>u.dead)||b.time>=75){
     const ratios=b.units.map(u=>u.health.body/u.stats.pools.body),won=b.units[1].dead&&!b.units[0].dead||!b.units[0].dead&&!b.units[1].dead&&ratios[0]>ratios[1];
-    b.result={won,time:+b.time.toFixed(1),timeout:b.time>=75,damage:Math.round(b.units[0].damage),accuracy:b.units[0].shots?Math.round(b.units[0].hits/b.units[0].shots*100):0,health:Math.round(ratios[0]*100),broken:[...b.units[1].broken],seed:b.seed};
+    b.result={won,time:+b.time.toFixed(1),timeout:b.time>=75,damage:Math.round(b.units[0].damage),accuracy:b.units[0].shots?Math.round(b.units[0].hits/b.units[0].shots*100):0,health:Math.round(ratios[0]*100),broken:[...b.units[1].broken],ownBroken:[...b.units[0].broken],weapons:Object.entries(b.units[0].weaponReport).map(([slot,data])=>({slot,id:b.units[0].build[slot],...data})),seed:b.seed};
     event(b,'end',{won});return b.result;
   }
   return null;
