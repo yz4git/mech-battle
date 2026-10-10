@@ -4,7 +4,9 @@
 
 [ゲームを遊ぶ](https://mech-battle-iron-salvage.yzgame.chatgpt.site)
 
-![1.5の専用輪郭モデル（検証ブラウザのCPU描画）](docs/hangar-v1.5-preview.jpg)
+![見本と修正前後の比率比較（正投影・CPU描画）](docs/a11-ratio-v1.6.jpg)
+
+1.6：見本の頭頂〜足裏を100%として、頭の幅・高さ・奥行き、肩・胸・骨盤の幅と6か所の関節位置を計測し校正。[計測表と定義](docs/proportions-v1.6.md)。
 
 ## 1.5 の更新
 

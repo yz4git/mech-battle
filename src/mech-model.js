@@ -1,10 +1,10 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.5.0';
-import {palette} from './mech-surface.js?v=1.5.0';
-import {panel,shell,block,cyl,ring,bar,piston,bolts,vent,light,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.5.0';
-import {makeWeapon} from './mech-weapons.js?v=1.5.0';
-import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.5.0';
-import {createReferenceFrame} from './reference-frame.js?v=1.5.0';
+import {getPart,MAKERS} from './parts.js?v=1.6.0';
+import {palette} from './mech-surface.js?v=1.6.0';
+import {panel,shell,block,cyl,ring,bar,piston,bolts,vent,light,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.6.0';
+import {makeWeapon} from './mech-weapons.js?v=1.6.0';
+import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.6.0';
+import {createReferenceFrame} from './reference-frame.js?v=1.6.0';
 
 function group(parent,x=0,y=0,z=0){const g=new T.Group();g.position.set(x,y,z);parent.add(g);return g;}
 function joint(parent,x,y,z,r,width){

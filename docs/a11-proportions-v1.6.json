@@ -1,0 +1,82 @@
+{
+  "pixels": {
+    "helmetTop": 155,
+    "chin": 219,
+    "sole": 728,
+    "head": [
+      200,
+      260
+    ],
+    "headSide": [
+      875,
+      946
+    ],
+    "shoulder": [
+      76,
+      392
+    ],
+    "chest": [
+      146,
+      296
+    ],
+    "pelvis": [
+      145,
+      289
+    ],
+    "shoulderY": 249,
+    "elbowY": 313,
+    "wristY": 413,
+    "hipY": 398,
+    "kneeY": 511,
+    "ankleY": 657
+  },
+  "reference": {
+    "headWidth": 10.471204188481675,
+    "headHeight": 11.169284467713787,
+    "headDepth": 12.390924956369982,
+    "shoulderWidth": 55.14834205933682,
+    "chestWidth": 26.17801047120419,
+    "pelvisWidth": 25.13089005235602,
+    "shoulderHeight": 83.59511343804537,
+    "elbowHeight": 72.42582897033158,
+    "wristHeight": 54.973821989528794,
+    "hipHeight": 57.59162303664922,
+    "kneeHeight": 37.87085514834206,
+    "ankleHeight": 12.390924956369982
+  },
+  "before": {
+    "height": 5.059448163658364,
+    "floor": 0.29435182675721017,
+    "helmetTop": 5.353799990415574,
+    "shoulderWidth": 76.2225792376746,
+    "headWidth": 15.100461050618176,
+    "headHeight": 12.519151652990967,
+    "headDepth": 14.359190141397827,
+    "chestWidth": 38.02163649656784,
+    "pelvisWidth": 28.263952026620654,
+    "shoulderHeight": 81.54344188911769,
+    "elbowHeight": 62.3713905383906,
+    "wristHeight": 43.19933918766352,
+    "hipHeight": 50.51238970288933,
+    "kneeHeight": 28.23571983574582,
+    "ankleHeight": 5.76533979584455
+  },
+  "after": {
+    "height": 4.960013404520154,
+    "floor": 0.29641158709347215,
+    "helmetTop": 5.256424991613627,
+    "shoulderWidth": 55.591703486621014,
+    "headWidth": 10.474165232508769,
+    "headHeight": 11.173860726992666,
+    "headDepth": 12.391406663308189,
+    "chestWidth": 26.621246136192884,
+    "pelvisWidth": 25.94751055383153,
+    "shoulderHeight": 83.13663848465859,
+    "elbowHeight": 72.45118349139183,
+    "wristHeight": 55.112520672128774,
+    "hipHeight": 57.53186897249106,
+    "kneeHeight": 37.77251556130697,
+    "ankleHeight": 12.480543194991318
+  },
+  "uncertaintyPercent": 0.8726003490401396
+}
