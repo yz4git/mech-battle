@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import {finish} from './mech-surface.js?v=1.3.0';
+import {finish} from './mech-surface.js?v=1.4.0';
 
 const cache=new Map();
 let compact=false;
@@ -14,6 +14,10 @@ export const profiles={
   wedge:[[-.5,-.5],[.5,-.5],[.4,.33],[0,.55],[-.4,.33]],
   blade:[[-.16,-.5],[.16,-.5],[.23,.24],[0,.5],[-.23,.24]]
 };
+profiles.chest=[[-.28,-.5],[.3,-.5],[.5,-.2],[.44,.37],[.2,.5],[-.44,.4],[-.5,-.12]];
+profiles.pauldrons=[[-.44,-.28],[-.1,-.5],[.36,-.39],[.5,-.05],[.44,.35],[.21,.5],[-.4,.43],[-.5,.14]];
+profiles.greave=[[-.25,-.5],[.26,-.5],[.46,-.28],[.5,.22],[.27,.5],[-.34,.45],[-.48,.02]];
+profiles.helmet=[[-.27,-.5],[.28,-.5],[.49,-.2],[.4,.3],[.12,.5],[-.33,.4],[-.47,.02]];
 function mesh(parent,g,color,x,y,z,kind='paint'){
   const m=new T.Mesh(g,finish(color,kind));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;parent.add(m);return m;
 }
@@ -25,6 +29,24 @@ function uvPlanar(g){
     uv[i*2+1]=(ny>nx&&ny>nz?p.getZ(i):p.getY(i))*.65+.41;
   }
   g.setAttribute('uv',new T.BufferAttribute(uv,2));return g;
+}
+// Broad planar armor faces, a sloped bevel belt and tapered side walls.
+// Unlike a central pyramid, these surfaces keep the large machined faces of the reference.
+export function shell(parent,w,h,d,x,y,z,color,profile='plate',inset=.15,taper=.84){
+  const key=`shell:${w}:${h}:${d}:${profile}:${inset}:${taper}`;
+  if(!cache.has(key)){
+    const pts=profiles[profile],a=[],front=pts.map(([xx,yy])=>new T.Vector2(xx*w*(1-inset),yy*h*(1-inset)));
+    const tri=(p,q,r)=>a.push(...p,...q,...r),ringZ=d*.25;
+    for(const [i,j,k] of T.ShapeUtils.triangulateShape(front,[]))tri([front[i].x,front[i].y,d/2],[front[j].x,front[j].y,d/2],[front[k].x,front[k].y,d/2]);
+    const back=pts.map(([xx,yy])=>new T.Vector2(xx*w*taper,yy*h*taper));
+    for(const [i,j,k] of T.ShapeUtils.triangulateShape(back,[]))tri([back[k].x,back[k].y,-d/2],[back[j].x,back[j].y,-d/2],[back[i].x,back[i].y,-d/2]);
+    for(let i=0;i<pts.length;i++){
+      const j=(i+1)%pts.length,o=[pts[i][0]*w,pts[i][1]*h,ringZ],n=[pts[j][0]*w,pts[j][1]*h,ringZ],f=[front[i].x,front[i].y,d/2],nf=[front[j].x,front[j].y,d/2],b=[back[i].x,back[i].y,-d/2],nb=[back[j].x,back[j].y,-d/2];
+      tri(o,n,nf);tri(o,nf,f);tri(b,nb,n);tri(b,n,o);
+    }
+    const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(a,3));g.computeVertexNormals();cache.set(key,uvPlanar(g));
+  }
+  return mesh(parent,cache.get(key),color,x,y,z);
 }
 export function panel(parent,w,h,d,x,y,z,color,profile='plate',bevel=.035){
   const key=`p:${w}:${h}:${d}:${profile}:${bevel}`;

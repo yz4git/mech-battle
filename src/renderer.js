@@ -1,10 +1,10 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.3.0';
-import {COVERS} from './simulation.js?v=1.3.0';
-import {batchRigidMeshes} from './mesh-batch.js?v=1.3.0';
-import {createMech} from './mech-model.js?v=1.3.0';
-import {SoftwareRenderer} from './software-renderer.js?v=1.3.0';
-import {CombatEffects} from './combat-effects.js?v=1.3.0';
+import {getPart,MAKERS} from './parts.js?v=1.4.0';
+import {COVERS} from './simulation.js?v=1.4.0';
+import {batchRigidMeshes} from './mesh-batch.js?v=1.4.0';
+import {createMech} from './mech-model.js?v=1.4.0';
+import {SoftwareRenderer} from './software-renderer.js?v=1.4.0';
+import {CombatEffects} from './combat-effects.js?v=1.4.0';
 
 const geometries=new Map(),materials=new Map();
 const dark=0x20272a,joint=0x11191d,steel=0x79848a;

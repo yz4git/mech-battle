@@ -1,9 +1,9 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.3.0';
-import {palette} from './mech-surface.js?v=1.3.0';
-import {panel,block,cyl,ring,bar,piston,bolts,vent,light,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.3.0';
-import {makeWeapon} from './mech-weapons.js?v=1.3.0';
-import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.3.0';
+import {getPart,MAKERS} from './parts.js?v=1.4.0';
+import {palette} from './mech-surface.js?v=1.4.0';
+import {panel,shell,block,cyl,ring,bar,piston,bolts,vent,light,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.4.0';
+import {makeWeapon} from './mech-weapons.js?v=1.4.0';
+import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.4.0';
 
 function group(parent,x=0,y=0,z=0){const g=new T.Group();g.position.set(x,y,z);parent.add(g);return g;}
 function joint(parent,x,y,z,r,width){
@@ -22,33 +22,47 @@ function extraArmor(parent,p,w,h,x,y,z,c){
   }
   return g;
 }
-function foot(parent,x,y,z,c,w=.68){
+function foot(parent,x,y,z,c,w=.84){
   const g=group(parent,x,y,z);
-  panel(g,w,.21,1.1,0,-.06,.11,c.black,'plate',.024);
-  const upper=panel(g,w*.92,.33,.78,0,.17,.17,c.paint,'toe');upper.rotation.x=-.2;
-  for(const s of [-1,1]){panel(g,w*.38,.25,.46,s*w*.25,.015,.58,c.light);block(g,w*.33,.065,.13,s*w*.25,-.05,.77,c.shade);}
-  panel(g,w*.74,.22,.37,0,.06,-.47,c.shade);bolts(g,w*.62,.14,0,.1,.827);
+  shell(g,w,.22,1.36,0,-.04,.18,c.black,'plate',.12);
+  const upper=shell(g,w*.94,.38,.91,0,.18,.16,c.paint,'toe',.12);upper.rotation.x=-.22;
+  for(const side of [-1,1]){
+    shell(g,w*.42,.25,.5,side*w*.255,.055,.66,c.light,'plate',.11);
+    block(g,w*.34,.052,.13,side*w*.255,-.05,.86,c.frame);
+    const heel=group(g,side*w*.5,.17,-.17);heel.rotation.y=side*Math.PI/2;
+    shell(heel,.35,.29,.09,0,0,0,c.shade,'helmet',.13);cyl(heel,.092,.02,0,0,.06,0xb88d53,'z',.092,'paint',6);
+  }
+  const back=group(g,0,.23,-.55);back.rotation.y=Math.PI;
+  shell(back,w*.8,.32,.2,0,0,0,c.paint,'plate',.13);light(back,w*.38,.057,0,0,.13,0xffa847);
+  bolts(g,w*.6,.16,0,.14,.827);
 }
 function legDetail(leg,c,armor,side,accent){
-  joint(leg,0,0,0,.22,.55);
-  const thigh=panel(leg,.51,.91,.52,0,-.54,.04,c.paint,'wedge');thigh.rotation.x=-.1;
-  panel(leg,.33,.68,.13,0,-.47,.355,c.light,'wedge',.021);
-  panel(leg,.15,.83,.48,side*.28,-.51,-.01,c.shade);
-  piston(leg,[side*.22,-.13,-.29],[side*.22,-.94,-.19],.07);
-  cable(leg,[[0,-.13,-.33],[side*.16,-.46,-.42],[side*.12,-.9,-.27]],.037);
-  joint(leg,0,-1.14,.11,.225,.66);
-  const knee=panel(leg,.52,.46,.25,0,-1.06,.43,c.light,'wedge');knee.rotation.x=-.12;
-  bolts(leg,.28,.19,0,-1.02,.579);light(leg,.18,.037,0,-1.22,.52,accent);
-  const shin=panel(leg,.65,1.06,.6,0,-1.83,.04,c.paint,'shin');shin.rotation.x=.075;
-  panel(leg,.25,.77,.19,-side*.18,-1.83,.365,c.light,'wedge',.025);
-  panel(leg,.19,.84,.44,side*.32,-1.73,-.035,c.shade,'shin',.023);
-  vent(leg,.18,.39,side*.23,-1.76,.335);
-  extraArmor(leg,armor,.35,.49,-side*.09,-1.61,.41,c);
-  piston(leg,[side*.32,-1.28,-.24],[side*.28,-2.32,-.28],.072);
-  cyl(leg,.135,.32,0,-2.37,-.01,c.frame,'x');
-  panel(leg,.41,.24,.36,0,-2.33,.2,c.shade);
+  joint(leg,0,0,0,.23,.6);
+  shell(leg,.6,.98,.59,0,-.52,-.01,c.frame,'greave',.12);
+  const thigh=shell(leg,.56,.84,.22,0,-.49,.28,c.paint,'chest',.12);thigh.rotation.x=-.08;
+  shell(leg,.35,.59,.085,-side*.09,-.49,.43,c.light,'plate',.13);
+  bolts(leg,.3,.42,-side*.06,-.47,.477);
+  const thighRear=group(leg,0,-.49,-.32);thighRear.rotation.y=Math.PI;
+  shell(thighRear,.5,.76,.17,0,0,0,c.paint,'chest',.13);shell(thighRear,.23,.43,.055,side*.08,0,.11,c.light,'plate',.12);bolts(thighRear,.29,.43,0,0,.105);
+  piston(leg,[side*.25,-.12,-.29],[side*.25,-.92,-.24],.067);
+  cable(leg,[[0,-.13,-.32],[side*.14,-.47,-.43],[side*.12,-.9,-.28]],.03);
+  joint(leg,0,-1.15,.11,.24,.71);
+  const knee=shell(leg,.66,.53,.3,0,-1.13,.39,c.light,'greave',.13);knee.rotation.x=-.12;
+  light(leg,.31,.051,0,-1.24,.556,accent);bolts(leg,.36,.23,0,-1.1,.56);
+  const shin=shell(leg,.72,1.1,.64,0,-1.84,.025,c.paint,'greave',.14);shin.rotation.x=.08;
+  shell(leg,.4,.84,.12,-side*.08,-1.81,.397,c.light,'greave',.12);
+  const outer=group(leg,side*.35,-1.8,-.015);outer.rotation.y=side*Math.PI/2;
+  shell(outer,.63,1.02,.24,0,0,0,c.paint,'greave',.13);
+  shell(outer,.33,.4,.06,0,.17,.16,c.light,'plate',.15);
+  cyl(outer,.12,.032,0,-.19,.17,c.frame,'z');ring(outer,.105,.019,0,-.19,.193,c.steel);
+  const rear=group(leg,0,-1.87,-.33);rear.rotation.y=Math.PI;
+  shell(rear,.46,.81,.12,0,0,0,c.shade,'greave',.13);vent(rear,.27,.25,0,.05,.09);
+  extraArmor(leg,armor,.34,.46,-side*.09,-1.62,.46,c);
+  piston(leg,[side*.3,-1.3,-.27],[side*.27,-2.32,-.3],.067);
+  joint(leg,0,-2.38,-.02,.17,.64);
+  shell(leg,.45,.29,.39,0,-2.35,.18,c.shade,'plate',.15);
   foot(leg,0,-2.63,.11,c);
-  decal(leg,side<0?'01':'02',.16,.085,-side*.08,-1.68,.491);
+  decal(leg,side<0?'01':'02',.16,.085,-side*.08,-1.74,.54);
 }
 
 export function createMech(build,paint,enemy,paints,reduced=false){
@@ -62,13 +76,13 @@ export function createMech(build,paint,enemy,paints,reduced=false){
   panel(torso,width*.66,1.11,.97,0,-.04,-.03,c.frame,'wedge');
   cyl(torso,.34,.81,0,-.83,-.02,c.black,'y',.27,'rubber');
   for(let j=0;j<4;j++)panel(torso,.67-j*.035,.105,.67,0,-.61-j*.14,.01,j%2?c.frame:c.shade);
-  const core=panel(torso,width*.38,1.17,.44,0,.02,.57,c.paint,'wedge',.045);core.rotation.x=-.13;
-  panel(torso,width*.24,.48,.1,0,.38,.842,c.light,'wedge');
+  const core=shell(torso,width*.38,1.2,.47,0,.04,.57,c.paint,'chest',.14);core.rotation.x=-.13;
+  shell(torso,width*.27,.52,.12,0,.39,.855,c.light,'chest',.12);
   vent(torso,width*.18,.16,0,-.16,.916);
   for(const s of [-1,1]){
-    const chest=panel(torso,width*.46,.98,.48,s*width*.315,.13,.36,c.light,'breast',.04);chest.rotation.y=s*.29;chest.rotation.z=-s*.075;chest.rotation.x=.24;
-    const rib=panel(torso,width*.35,.57,.56,s*width*.34,-.36,.12,c.shade,'wedge');rib.rotation.y=s*.34;
-    vent(torso,.3,.2,s*width*.35,.16,.67);light(torso,.22,.039,s*width*.35,.18,.719,accent);
+    const chest=shell(torso,width*.49,1.02,.56,s*width*.32,.16,.33,c.light,'chest',.13);chest.rotation.y=s*.22;chest.rotation.z=-s*.065;chest.rotation.x=.18;
+    const rib=shell(torso,width*.34,.58,.56,s*width*.33,-.38,.12,c.shade,'chest',.15);rib.rotation.y=s*.34;
+    vent(torso,.34,.24,s*width*.35,.12,.725);for(let i=0;i<2;i++)light(torso,.25,.032,s*width*.35,.09+i*.095,.783,accent);
     panel(torso,.39,.18,.86,s*.63,.73,-.07,c.paint);
     bar(torso,[s*.51,.72,-.4],[s*.39,-.38,-.46],.07,c.steel);
     piston(torso,[s*.6,-.47,-.17],[s*.36,-1.02,.1],.082);
@@ -79,18 +93,18 @@ export function createMech(build,paint,enemy,paints,reduced=false){
   // Small recessed sensor head; the collar, jaw and sensor glass are separate layers.
   cyl(torso,.16,.25,0,.77,-.1,c.steel);
   const head=group(torso,0,.99,-.035);
-  panel(head,recon?.5:.58,.43,.65,0,.04,-.01,c.paint,'wedge',.025);
+  shell(head,recon?.53:.62,.46,.68,0,.055,-.005,c.paint,'helmet',.17);
   panel(head,.47,.17,.15,0,-.08,.34,c.black,'wedge',.014);
-  light(head,recon?.33:.37,.038,0,-.015,.438,accent);
-  panel(head,.2,.2,.12,0,-.21,.31,c.shade,'wedge',.014);
+  light(head,recon?.35:.41,.049,0,-.025,.445,accent);shell(head,.43,.14,.14,0,.095,.387,c.light,'helmet',.14);
+  shell(head,.25,.25,.16,0,-.2,.3,c.paint,'helmet',.13);
   for(const s of [-1,1]){panel(head,.13,.29,.36,s*.29,-.1,.01,c.light,'wedge',.016);cyl(head,.092,.085,s*.31,.05,-.08,c.frame,'x');cyl(head,.041,.09,s*.33,.05,-.08,c.steel,'x');}
-  panel(head,.15,.08,.48,0,.28,-.03,c.shade);bar(head,[.23,.18,-.22],[.35,.78,-.39],.016,c.steel);
+  panel(head,.15,.08,.48,0,.28,-.03,c.shade);bar(head,[.23,.18,-.22],[.41,1.2,-.49],.016,c.steel);
   decal(torso,'07',.2,.12,-.58,.47,.648);
   decal(torso,p.body.name,.42,.065,0,.16,.942,'#323e43');
   // Engine is a proper removable backpack with recessed exhaust nozzles and radiator fins.
   const ec=palette(paints[paint]?.color??MAKERS[p.engine.maker].color),back=group(torso,0,.02,-.78),jets=[];
   panel(back,.91,1.12,.5,0,0,-.02,ec.frame);
-  panel(back,.59,.85,.17,0,.04,-.36,ec.paint);
+  shell(back,.69,.94,.2,0,.04,-.36,ec.paint,'plate',.12);
   const rear=group(back,0,0,-.46);rear.rotation.y=Math.PI;
   vent(rear,.42,.27,0,.19,.025);bolts(rear,.43,.63,0,0,.021);decal(rear,'EXHAUST',.3,.064,0,-.19,.06,'#d0b378');
   for(const s of [-1,1]){
@@ -108,21 +122,28 @@ export function createMech(build,paint,enemy,paints,reduced=false){
     const ap=p[slot],ac=palette(paints[paint]?.color??MAKERS[ap.maker].color),anvil=ap.id.includes('-AV-'),precision=ap.id.includes('-SC-'),aw=anvil?1.21:precision?.82:1.0;
     const arm=group(torso,s*(width*.5+(tank?.49:.31)),.36,tank?.21:-.01);arms[slot]=arm;
     joint(arm,0,0,0,.3,.58);
-    const shell=panel(arm,aw,.87,.76,s*.18,.2,.02,ac.paint,'shoulder',.045);shell.rotation.z=-s*.1;
-    const front=panel(arm,aw*.86,.59,.1,s*.2,.26,.46,ac.light,'shoulder',.017);front.rotation.z=-s*.1;
-    panel(arm,.16,.63,.66,s*(aw*.54),.1,0,ac.shade,'wedge');
+    const shoulder=shell(arm,aw*1.07,.94,.82,s*.2,.23,.015,ac.paint,'pauldrons',.14);shoulder.rotation.z=-s*.12;
+    const front=shell(arm,aw*.9,.64,.12,s*.22,.26,.486,ac.light,'pauldrons',.09);front.rotation.z=-s*.12;
+    const flank=group(arm,s*(aw*.64),.24,.015);flank.rotation.y=s*Math.PI/2;
+    shell(flank,.67,.73,.16,0,0,0,ac.paint,'pauldrons',.12);bolts(flank,.37,.38,0,0,.11);decal(flank,'03',.25,.17,0,.09,.112);
+    const shoulderRear=group(arm,s*.2,.2,-.46);shoulderRear.rotation.y=Math.PI;
+    shell(shoulderRear,aw*.8,.6,.13,0,0,0,ac.paint,'pauldrons',.12);vent(shoulderRear,.27,.16,0,-.05,.09);
     extraArmor(arm,p[slot==='armL'?'armorArmL':'armorArmR'],aw*.51,.29,s*.23,.22,.538,ac);
     decal(arm,s<0?'07':'03',.27,.18,s*.25,.25,.61);
     bolts(arm,aw*.6,.38,s*.18,.2,.528);
     panel(arm,precision?.31:.4,.63,.43,0,-.55,-.025,ac.frame,'wedge');
-    const upper=panel(arm,anvil?.51:.43,.57,.2,0,-.49,.28,ac.paint,'wedge');upper.rotation.x=-.11;
+    const upper=shell(arm,anvil?.56:.46,.63,.23,0,-.48,.27,ac.paint,'chest',.13);upper.rotation.x=-.11;
+    const upperRear=group(arm,0,-.52,-.26);upperRear.rotation.y=Math.PI;
+    shell(upperRear,anvil?.48:.38,.53,.13,0,0,0,ac.paint,'chest',.13);
     piston(arm,[s*.22,-.22,-.25],[s*.22,-.95,-.25],.064);
     cable(arm,[[-s*.2,-.11,-.13],[-s*.32,-.48,-.28],[-s*.2,-.92,-.12]],.034);
     joint(arm,0,-.99,.015,.19,.51);
-    panel(arm,anvil?.7:.54,.86,.59,0,-1.39,.085,ac.paint,'shin');
-    panel(arm,.21,.7,.16,s*.18,-1.39,.42,ac.light,'wedge',.024);
+    shell(arm,anvil?.77:.62,.91,.65,0,-1.43,.085,ac.paint,'greave',.13);
+    shell(arm,.32,.7,.12,s*.12,-1.4,.453,ac.light,'greave',.13);
     extraArmor(arm,p[slot==='armL'?'armorArmL':'armorArmR'],.29,.46,-s*.06,-1.35,.435,ac);
-    vent(arm,.13,.36,-s*.2,-1.47,.413);bolts(arm,.34,.54,0,-1.41,.392);
+    vent(arm,.12,.31,-s*.22,-1.47,.444);bolts(arm,.35,.5,0,-1.43,.43);
+    const foreRear=group(arm,0,-1.43,-.28);foreRear.rotation.y=Math.PI;
+    shell(foreRear,.43,.72,.14,0,0,0,ac.shade,'greave',.12);shell(foreRear,.23,.44,.06,0,.07,.1,ac.paint,'plate',.12);
     cyl(arm,.15,.18,0,-1.94,.08,ac.steel);panel(arm,.32,.25,.33,0,-2.05,.08,ac.frame);
     for(let j=0;j<4;j++){
       panel(arm,.064,.14,.14,-.12+j*.08,-2.16,.25,ac.shade,'plate',.007);
@@ -137,8 +158,8 @@ export function createMech(build,paint,enemy,paints,reduced=false){
     }
   }
   const hips=group(root,0,cy-1.12,0),lc=palette(paints[paint]?.color??MAKERS[p.legs.maker].color);
-  panel(hips,.94,.39,.76,0,.05,0,c.frame);panel(hips,.36,.53,.25,0,-.05,.49,c.paint,'wedge');light(hips,.18,.045,0,.17,.639,accent);
-  for(const s of [-1,1]){const skirt=panel(hips,.5,.57,.22,s*.46,-.12,.39,c.light,'breast');skirt.rotation.y=s*.23;skirt.rotation.z=s*.14;bolts(hips,.2,.24,s*.47,-.06,.54);const hip=panel(hips,.23,.49,.75,s*.65,-.01,-.01,c.paint,'wedge');hip.rotation.z=s*.15;}
+  panel(hips,.94,.39,.76,0,.05,0,c.frame);shell(hips,.39,.62,.3,0,-.07,.49,c.paint,'chest',.15);shell(hips,.3,.24,.07,0,.18,.67,0xbe8c45,'plate',.15);light(hips,.17,.042,0,.21,.714,accent);
+  for(const s of [-1,1]){const skirt=shell(hips,.59,.67,.24,s*.49,-.15,.37,c.light,'chest',.12);skirt.rotation.y=s*.23;skirt.rotation.z=s*.14;bolts(hips,.2,.24,s*.47,-.06,.54);const hip=panel(hips,.23,.49,.75,s*.65,-.01,-.01,c.paint,'wedge');hip.rotation.z=s*.15;}
   const legs=[];
   if(tank){
     cyl(root,.73,.34,0,2.02,-.03,lc.frame);ring(root,.69,.045,0,2.18,-.03,lc.steel,'y');

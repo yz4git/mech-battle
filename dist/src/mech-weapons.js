@@ -1,19 +1,18 @@
 import * as T from '../vendor/three.module.min.js';
-import {MAKERS} from './parts.js?v=1.3.0';
-import {palette} from './mech-surface.js?v=1.3.0';
-import {panel,block,cyl,ring,bolts,vent,light,decal} from './mech-geometry.js?v=1.3.0';
+import {MAKERS} from './parts.js?v=1.4.0';
+import {palette} from './mech-surface.js?v=1.4.0';
+import {panel,shell,block,cyl,ring,bolts,vent,light,decal} from './mech-geometry.js?v=1.4.0';
 
 export function makeWeapon(parent,p,accent){
   const g=new T.Group();parent.add(g);if(!p)return g;
   const c=palette(MAKERS[p.maker].color),kind=p.kind;
   if(kind==='missile'){
-    panel(g,1.03,.94,1.34,0,0,-.12,c.shade);
-    panel(g,1.06,.91,.13,0,0,.61,c.paint);
-    for(const x of [-.29,0,.29])for(const y of [-.22,.1,.42].slice(0,2)){
-      cyl(g,.127,.08,x,y+.06,.703,c.black,'z',.127,'rubber');
-      ring(g,.128,.019,x,y+.06,.755,c.steel);
-      cyl(g,.073,.03,x,y+.06,.729,0x72736b,'z');
-      cyl(g,.036,.05,x,y+.06,.743,0xb09d82,'z',.065);
+    shell(g,1.1,1.02,1.4,0,0,-.12,c.shade,'plate',.11);
+    shell(g,1.17,1.03,.14,0,0,.61,c.paint,'plate',.09);
+    for(const x of [-.31,0,.31])for(const y of [-.24,.12]){
+      cyl(g,.142,.09,x,y+.06,.703,0x090e12,'z',.142,'rubber');
+      ring(g,.149,.021,x,y+.06,.755,c.steel);
+      cyl(g,.076,.015,x,y+.06,.742,0x273037,'z',.076,'rubber');
     }
     for(const s of [-1,1]){
       panel(g,.13,.89,1.08,s*.53,0,-.11,c.light);
@@ -21,7 +20,7 @@ export function makeWeapon(parent,p,accent){
       light(g,.026,.27,s*.47,0,.709,accent);
       for(const z of [-.56,.22])cyl(g,.042,.06,s*.62,.27,z,c.steel,'x',.042,'metal',6);
     }
-    panel(g,.83,.12,1.14,0,.51,-.08,c.paint);
+    shell(g,.92,.15,1.2,0,.55,-.08,c.paint,'plate',.12);
     const rear=new T.Group();rear.position.z=-.825;rear.rotation.y=Math.PI;g.add(rear);vent(rear,.58,.23,0,-.24,0);bolts(rear,.73,.57,0,.05,0);
     bolts(g,.78,.7,0,0,.713);decal(g,'06',.21,.13,.26,.32,.69);
     g.userData.muzzle=new T.Vector3(0,0,.78);return g;
@@ -44,7 +43,12 @@ export function makeWeapon(parent,p,accent){
   const cannon=kind==='cannon',sniper=kind==='sniper',rail=kind==='railgun',mg=kind==='machinegun',laser=kind==='laser',shotgun=kind==='shotgun';
   const length=cannon?3.25:sniper?3.45:rail?3.2:mg?2.63:2.65;
   panel(g,cannon?.63:.45,cannon?.61:.45,1.4,0,0,.34,c.shade);
-  panel(g,cannon?.66:.48,.17,1.05,0,.22,.33,c.paint);
+  shell(g,cannon?.71:.5,.2,1.17,0,.23,.32,c.paint,'plate',.12);
+  for(const side of [-1,1]){
+    const receiver=new T.Group();receiver.position.set(side*(cannon?.36:.265),.03,.31);receiver.rotation.y=side*Math.PI/2;g.add(receiver);
+    shell(receiver,1.08,cannon?.48:.36,.09,0,0,0,c.paint,'chest',.13);
+    bolts(receiver,.57,.2,0,0,.065);decal(receiver,'03',.19,.085,0,.03,.071);
+  }
   for(const s of [-1,1]){
     panel(g,.07,.29,.73,s*(cannon?.34:.25),0,.25,c.light);
     for(let i=0;i<3;i++)block(g,.024,.13,.07,s*(cannon?.39:.3),.01,.03+i*.19,c.black,'rubber');
@@ -67,7 +71,8 @@ export function makeWeapon(parent,p,accent){
   }else{
     const radius=cannon?.145:shotgun?.11:.064;
     cyl(g,radius,length-.5,0,0,1.53,c.steel,'z');
-    panel(g,cannon?.5:.34,cannon?.43:.3,1.05,0,.035,1.37,c.frame);
+    shell(g,cannon?.56:.38,cannon?.48:.33,1.12,0,.035,1.38,c.frame,'plate',.12);
+    if(!cannon)for(const side of [-1,1])shell(g,.095,.28,1.48,side*.19,.015,1.74,c.paint,'plate',.12);
     for(let i=0;i<5;i++){
       block(g,cannon?.53:.37,.045,.07,0,.23,1.02+i*.18,c.paint);
       for(const s of [-1,1])block(g,.02,.15,.085,s*(cannon?.27:.19),.01,1.02+i*.18,c.black,'rubber');
