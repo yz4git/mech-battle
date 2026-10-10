@@ -1,5 +1,5 @@
-import {getPart,MAKERS,SLOT_DEFS,TACTICS} from './parts.js?v=1.7.0';
-import {analyzeBuild,compareBuild,combatAdvice,compareWeapon,weaponSlot} from './build-analysis.js?v=1.7.0';
+import {getPart,MAKERS,SLOT_DEFS,TACTICS} from './parts.js?v=1.8.0';
+import {analyzeBuild,compareBuild,combatAdvice,compareWeapon,weaponSlot} from './build-analysis.js?v=1.8.0';
 const value=n=>n===null?'—':n===Infinity?'∞':n===-Infinity?'−∞':Number.isInteger(n)?n.toLocaleString('ja-JP'):Number(n.toFixed(2)).toLocaleString('ja-JP');
 const deltaValue=r=>r.delta===null?'—':r.delta===0?'±0':r.delta===Infinity?'無限化':r.delta===-Infinity?'有限化':(r.delta>0?'+':'')+value(r.delta);
 const tone=r=>r.trend>0?'plus':r.trend<0?'minus':'unchanged';

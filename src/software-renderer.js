@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import {SoftwareShadow} from './software-shadow.js?v=1.7.0';
+import {SoftwareShadow} from './software-shadow.js?v=1.8.0';
 
 // Bounded-resolution, depth-buffered fallback. Uses exactly the gameplay meshes.
 // It stays idle in the garage; transparent surfaces depth-test without depth-writing.

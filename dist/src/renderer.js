@@ -1,10 +1,11 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.7.0';
-import {COVERS} from './simulation.js?v=1.7.0';
-import {batchRigidMeshes} from './mesh-batch.js?v=1.7.0';
-import {createMech} from './mech-model.js?v=1.7.0';
-import {SoftwareRenderer} from './software-renderer.js?v=1.7.0';
-import {CombatEffects} from './combat-effects.js?v=1.7.0';
+import {getPart,MAKERS} from './parts.js?v=1.8.0';
+import {COVERS} from './simulation.js?v=1.8.0';
+import {batchRigidMeshes} from './mesh-batch.js?v=1.8.0';
+import {createMech} from './mech-model.js?v=1.8.0';
+import {SoftwareRenderer} from './software-renderer.js?v=1.8.0';
+import {CombatCinematography} from './combat-cinematography.js?v=1.8.0';
+import {CombatEffects} from './combat-effects.js?v=1.8.0';
 
 const geometries=new Map(),materials=new Map();
 const dark=0x20272a,joint=0x11191d,steel=0x79848a;
@@ -37,7 +38,7 @@ function groundTexture(theme){const canvas=document.createElement('canvas');canv
 function floorMark(parent,text,x,z,width=5){const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const ctx=canvas.getContext('2d');ctx.fillStyle='#bec2a7';ctx.font='bold 95px monospace';ctx.textAlign='center';ctx.fillText(text,256,98);const texture=new T.CanvasTexture(canvas);const m=new T.Mesh(new T.PlaneGeometry(width,width/4),new T.MeshBasicMaterial({map:texture,transparent:true,opacity:.38,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.set(x,.018,z);parent.add(m);}
 export class MechScene{
   constructor(holder){
-    this.holder=holder;this.tags=[];this.popups=[];this.feedback=document.createElement('div');this.feedback.className='combat-feedback';this.feedback.setAttribute('aria-hidden','true');holder.append(this.feedback);this.time=0;this.mode='hangar';this.angle=.52;this.zoom=1;this.shake=0;this.reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;this.drag=false;this.cameraMode=0;this.projectiles=new Map();this.unitModels=[];this.dirty=true;this.lastSoftwareFrame=0;this.lastBattleTime=-1;
+    this.holder=holder;this.tags=[];this.popups=[];this.feedback=document.createElement('div');this.feedback.className='combat-feedback';this.feedback.setAttribute('aria-hidden','true');holder.append(this.feedback);this.time=0;this.mode='hangar';this.angle=.52;this.zoom=1;this.shake=0;this.reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;this.cinema=new CombatCinematography(this.reducedMotion);this.drag=false;this.cameraMode=0;this.projectiles=new Map();this.unitModels=[];this.dirty=true;this.lastSoftwareFrame=0;this.lastBattleTime=-1;
     try{this.renderer=new T.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});}catch{this.renderer=new SoftwareRenderer();}
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.65));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFSoftShadowMap;
     this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.13;
@@ -122,29 +123,30 @@ export class MechScene{
   setMission(build,enemy,theme,paint=0){this.mode='mission';this.makeEnvironment(theme);this.setModels([build,enemy],paint);this.unitModels[0].position.set(-4,0,-5);this.unitModels[0].rotation.y=.32;this.unitModels[1].position.set(4,0,5);this.unitModels[1].rotation.y=Math.PI+.32;this.clearEffects();}
   setBattle(b,paint=0){this.mode='battle';this.makeEnvironment(b.info.theme);this.setModels(b.units.map(u=>u.build),paint);this.clearEffects();this.battle=b;this.tags=b.units.map(u=>{const el=document.createElement('span');el.className=`unit-tag ${u.id?'hostile':'friendly'}`;el.textContent=u.id?'敵機':'自機';this.feedback.append(el);return el;});}
   setModels(builds,paint){this.unitModels.forEach(m=>{this.scene.remove(m);m.userData.materials?.forEach(x=>x.dispose());m.traverse(o=>{if(o.isMesh&&(o.geometry.type==='PlaneGeometry'||o.geometry.userData.owned))o.geometry.dispose();if(o.isMesh&&o.material.transparent&&!o.material.userData.shared)o.material.dispose();});});this.unitModels=builds.map((b,i)=>{const m=makeMech(b,i===0?paint:0,i!==0,this.renderer instanceof SoftwareRenderer&&this.mode!=='hangar');this.scene.add(m);return m;});this.dirty=true;}
-  clearEffects(){this.tags=[];this.popups=[];this.feedback.replaceChildren();this.fx.reset();for(const mesh of this.projectiles.values()){this.scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();}this.projectiles.clear();}
+  clearEffects(){this.tags=[];this.popups=[];this.feedback.replaceChildren();this.fx.reset();this.cinema.reset();this.shake=0;for(const mesh of this.projectiles.values()){this.scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();}this.projectiles.clear();}
   consumeEvents(events){
-    this.fx.consume(events,this.unitModels,this.battle);
+    this.fx.consume(events,this.unitModels,this.battle);if(this.battle)this.cinema.consume(events,this.battle.units);
     for(const e of events){
       if(e.type==='hit'){const big=e.kind==='cannon'||e.kind==='missile';this.shake=Math.min(2.4,this.shake+(big?.7:.1));this.popup(e,`${e.amount}`,e.unit===0?'received':'damage');}
       if(e.type==='fire'&&(e.kind==='cannon'||e.kind==='railgun'))this.shake=Math.max(this.shake,.3);
       if(e.type==='destroy'||e.type==='break'){this.shake=e.type==='destroy'?2.5:1.4;this.popup(e,e.type==='destroy'?'CORE DESTROYED':({armL:'LEFT ARM LOST',armR:'RIGHT ARM LOST',legs:'LEGS DISABLED'}[e.slot]),'part-break');}
     }
   }
+  audioMix(){return this.unitModels.map(m=>{const p=m.position.clone();p.y=2.5;const distance=p.distanceTo(this.camera.position),q=p.clone().project(this.camera);return{tracked:m.userData.tank,pan:Math.max(-.8,Math.min(.8,q.x*.7)),level:Math.max(.4,Math.min(1,20/distance))};});}
   popup(e,text,kind){if(this.popups.length>=14){this.popups.shift().el.remove();}const el=document.createElement('span');el.className=`combat-number ${kind}`;el.textContent=text;this.feedback.append(el);this.popups.push({el,x:e.x,z:e.z,life:1.1,total:1.1,y:kind==='part-break'?5.3:3.5});}
 
   animateMech(model,u,dt){
     const d=model.userData;
-    for(const m of d.materials||[]){m.emissive.copy(m.userData.baseEmissive);m.emissiveIntensity=m.userData.baseIntensity;if(u?.armorFlash>0){m.emissive.setHex(0xff6f32);m.emissiveIntensity=.6;}}
+    for(const m of d.materials||[]){m.emissive.copy(m.userData.baseEmissive);m.emissiveIntensity=m.userData.baseIntensity;if(u?.armorFlash>0){m.emissive.setHex(0xff6f32);m.emissiveIntensity=.12*Math.min(1,u.armorFlash/.14);}}
     if(u){model.position.set(u.x,0,u.z);model.rotation.y=u.yaw;model.rotation.z=u.dead?Math.min(.65,(this.time-(model.userData.deathAt??=this.time))*.5):0;
-      model.position.y=u.dead?-.2:0;d.torso.rotation.z=u.stun>0?Math.sin(this.time*35)*.04:0;
+      const reaction=this.cinema.reactions[u.id],kick=this.reducedMotion?0:Math.sin(Math.PI*reaction.life/.32)*reaction.power;model.position.x+=reaction.dx*kick*.16;model.position.z+=reaction.dz*kick*.16;model.position.y=u.dead?-.2:0;d.torso.rotation.z=u.stun>0?Math.sin(this.time*35)*.04:0;
       for(const [slot,gun] of Object.entries(d.guns)){
         gun.userData.restZ??=gun.position.z;gun.position.z=gun.userData.restZ-(getPart(u.build[slot])?.melee?0:Math.min(1,(u.firePose[slot]||0)/.18)*.15);
         if(slot==='weaponL'||slot==='weaponR')gun.rotation.x=0;
       }
       d.arms.armL.visible=u.health.armL>0;d.arms.armR.visible=u.health.armR>0;
       d.walkPhase=(d.walkPhase||0)+dt*u.move*2.7;const step=d.walkPhase;d.legs.forEach((leg,i)=>leg.rotation.x=u.health.legs<=0?-.15:Math.sin(step+i*Math.PI)*(u.move>0?.24:.008));
-      d.torso.position.y=d.cy+(u.move>0&&!d.tank?Math.abs(Math.sin(step))*.09:0);d.torso.rotation.x=u.boost>0?.1:0;
+      d.torso.position.y=d.cy+(u.move>0&&!d.tank?Math.abs(Math.sin(step))*.09:0);d.torso.rotation.x=(u.boost>0?.13:0)+kick*.075;d.torso.rotation.z+=kick*.035*(u.id?1:-1);
       for(const [slot,arm] of [['weaponL',d.arms.armL],['weaponR',d.arms.armR]]){
         const p=getPart(u.build[slot]),pose=u.firePose[slot]||0;
         const target=this.battle?.units[1-u.id],range=target?Math.hypot(target.x-u.x,target.z-u.z):15,targetHeight=this.unitModels[1-u.id]?.userData.cy||d.cy;
@@ -164,7 +166,7 @@ export class MechScene{
   }
   render(dt,b=null){if(this.contextLost||dt===0&&!this.dirty)return;const frozen=dt===0;this.time+=dt;
     const software=this.renderer instanceof SoftwareRenderer;
-    if(software){const now=performance.now();if(now-this.lastSoftwareFrame<130)return;if(this.mode!=='battle'&&!this.dirty)return;if(this.mode==='battle'&&b?.time===this.lastBattleTime&&!this.fx.active()&&!this.popups.length&&!this.dirty)return;dt=frozen?0:Math.min(.2,(now-this.lastSoftwareFrame)/1000||dt);this.lastSoftwareFrame=now;this.lastBattleTime=b?.time;}
+    this.cinema.update(frozen?0:dt);if(software){const now=performance.now();if(now-this.lastSoftwareFrame<130)return;if(this.mode!=='battle'&&!this.dirty)return;if(this.mode==='battle'&&b?.time===this.lastBattleTime&&!this.fx.active()&&!this.popups.length&&!this.dirty)return;dt=frozen?0:Math.min(.2,(now-this.lastSoftwareFrame)/1000||dt);this.lastSoftwareFrame=now;this.lastBattleTime=b?.time;}
     this.unitModels.forEach((m,i)=>this.animateMech(m,this.mode==='battle'?b?.units[i]:null,dt));
     if(this.mode==='battle'&&b){
       const ids=new Set(b.projectiles.map(p=>p.id));for(const [id,m]of this.projectiles)if(!ids.has(id)){this.scene.remove(m);m.geometry.dispose();m.material.dispose();this.projectiles.delete(id);}
@@ -180,30 +182,29 @@ export class MechScene{
         }
         const t=1-p.life/p.total,origin=m.userData.origin;m.position.copy(origin).lerp(new T.Vector3(p.tx,2.2,p.tz),t);if(p.kind==='missile')m.position.y+=Math.sin(t*Math.PI)*3.7;
         m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),new T.Vector3(p.tx-p.ax,p.kind==='missile'?Math.cos(t*Math.PI)*3.7*Math.PI:0,p.tz-p.az).normalize());
+        if(p.kind==='cannon'){m.scale.set(1.8,1.35,1.8);if(this.time-(m.userData.lastSmoke||0)>.075){m.userData.lastSmoke=this.time;this.fx.particle('smoke',m.position,{size:.28,life:.55,grow:.45,color:0xb3a999,opacity:.4});}}
         if(p.kind==='missile'&&this.time-(m.userData.lastSmoke||0)>.055){m.userData.lastSmoke=this.time;this.fx.missileTrail(m.position);}
       }
     }
+    if(this.mode!=='battle'&&this.camera.fov!==42){this.camera.fov=42;this.camera.updateProjectionMatrix();}
     let target=new T.Vector3(0,this.holder.clientHeight<380?2.3:2.5,0),r=(11.1+Math.max(0,1.3-this.camera.aspect)*3.5)*this.zoom,height=this.mode==='hangar'?4.25:5.15,angle=this.angle;
     if(this.mode!=='hangar'){
-      if(this.mode==='battle'&&b){const [a,c]=b.units;target.set((a.x+c.x)/2,1.8,(a.z+c.z)/2);const spread=Math.hypot(a.x-c.x,a.z-c.z);r=Math.max(14,spread*.58+8)+Math.max(0,1-this.camera.aspect)*4;height=this.cameraMode===1?32:Math.max(8,spread*.17+7);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI*.5+.24+this.angle-.52;
-        if(this.cameraMode===2){target.y=2.6;r=Math.max(10,spread*.48+7);height=Math.max(6.8,spread*.12+5.5);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI*.64+this.angle-.52;}
-        if(this.camera.aspect<.85){target.y=.35;height=this.cameraMode===1?32:Math.max(13,r*.65);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI+Math.max(-.4,Math.min(.4,this.angle-.52));if(this.cameraMode===1){height=Math.max(35,spread*1.2+16);r=7;}}
-      }
+      if(this.mode==='battle'&&b){const framing=this.cinema.composition(b.units,this.cameraMode,this.camera.aspect,this.angle-.52);target.set(framing.target.x,framing.target.y,framing.target.z);r=framing.radius;height=framing.height;angle=framing.angle;this.camera.fov=framing.fov;this.camera.updateProjectionMatrix();}
       else{target.set(0,1.4,0);r=22+Math.max(0,1-this.camera.aspect)*8;height=15;angle=this.angle+Math.PI;}
     }
     const pos=new T.Vector3(target.x+Math.sin(angle)*r,height,target.z+Math.cos(angle)*r);this.camera.clearViewOffset();
     if(this.mode==='battle'&&b){
       const previous=this.camera.position.clone(),portrait=this.camera.aspect<.85;
-      const lowerLimit=portrait?1-2*(this.holder.clientHeight-(this.holder.querySelector('#scene-bottom')?.offsetHeight||210)-16)/this.holder.clientHeight:-.56,upperLimit=portrait?.68:.58;
+      const lowerLimit=portrait?1-2*(this.holder.clientHeight-(this.holder.querySelector('#scene-bottom')?.offsetHeight||210)-16)/this.holder.clientHeight:Math.max(-.78,-1+2*(this.holder.clientHeight<420?62:95)/this.holder.clientHeight),upperLimit=portrait?.68:Math.min(.78,1-2*((this.holder.querySelector('#battle-hud')?.offsetHeight||75)+25)/this.holder.clientHeight);
       if(portrait)this.camera.setViewOffset(this.holder.clientWidth,this.holder.clientHeight,0,(upperLimit+lowerLimit)*this.holder.clientHeight/4,this.holder.clientWidth,this.holder.clientHeight);
       for(let attempt=0;attempt<12;attempt++){
         this.camera.position.copy(pos);this.camera.lookAt(target);this.camera.updateMatrixWorld(true);let outside=false;
-        for(const u of b.units)for(const dx of [-2.4,2.4])for(const dz of [-2.2,2.2])for(const y of [.15,6.35]){const q=new T.Vector3(u.x+dx,y,u.z+dz).project(this.camera);if(Math.abs(q.x)>.86||q.y>upperLimit||q.y<lowerLimit)outside=true;}
+        for(const u of b.units)for(const dx of [-2.0,2.0])for(const dz of [-1.9,1.9])for(const y of [.15,5.9]){const q=new T.Vector3(u.x+dx,y,u.z+dz).project(this.camera);if(Math.abs(q.x)>.86||q.y>upperLimit||q.y<lowerLimit)outside=true;}
         if(!outside)break;pos.sub(target).multiplyScalar(1.1).add(target);
       }
       this.camera.position.copy(previous);
     }
-    if(software)this.camera.position.copy(pos);else this.camera.position.lerp(pos,frozen?1:Math.min(1,dt*6));this.camera.lookAt(target);
+    if(software)this.camera.position.copy(pos);else this.camera.position.lerp(pos,frozen?1:Math.min(1,dt*6));this.camera.lookAt(target);if(this.mode==='battle'&&b&&!this.reducedMotion&&!frozen){const framing=this.cinema.composition(b.units,this.cameraMode,this.camera.aspect,this.angle-.52);this.camera.rotateZ(framing.roll);this.camera.position.addScaledVector(this.camera.position.clone().sub(target).normalize(),framing.kick);}
     if(this.shake>0&&!this.reducedMotion&&this.mode==='battle'){this.camera.position.x+=Math.sin(this.time*91)*this.shake*.06;this.camera.position.y+=Math.cos(this.time*73)*this.shake*.04;this.shake=Math.max(0,this.shake-dt*5);}
     // Hide the near perimeter when the camera crosses it; combat cover stays solid.
     for(const edge of this.perimeter)edge.group.visible=this.mode!=='battle'||edge.side*this.camera.position.x<18;

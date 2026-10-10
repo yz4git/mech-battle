@@ -1,4 +1,4 @@
-import {getPart,statsFor,SLOT_DEFS,accepts} from './parts.js?v=1.7.0';
+import {getPart,statsFor,SLOT_DEFS,accepts} from './parts.js?v=1.8.0';
 
 export function weaponSlot(build,id,preferred){
   const p=getPart(id),slots=SLOT_DEFS.filter(s=>s.type==='weapon'&&accepts(s,p));

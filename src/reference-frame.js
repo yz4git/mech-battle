@@ -1,10 +1,10 @@
 import * as T from '../vendor/three.module.min.js';
-import {MAKERS} from './parts.js?v=1.7.0';
-import {finish,palette} from './mech-surface.js?v=1.7.0';
-import {block,cyl,ring,bar,piston,bolts,vent,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.7.0';
-import {makeWeapon} from './mech-weapons.js?v=1.7.0';
-import {refineA11,compareA11Nodes} from './a11-outlines.js?v=1.7.0';
-import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.7.0';
+import {MAKERS} from './parts.js?v=1.8.0';
+import {finish,palette} from './mech-surface.js?v=1.8.0';
+import {block,cyl,ring,bar,piston,bolts,vent,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.8.0';
+import {makeWeapon} from './mech-weapons.js?v=1.8.0';
+import {refineA11,compareA11Nodes} from './a11-outlines.js?v=1.8.0';
+import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.8.0';
 
 // Dedicated A-11 control contours: no shared octagonal armor silhouette.
 // XY is front elevation. Each contour is counter-clockwise; Z builds the actual side volume.

@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import {finish} from './mech-surface.js?v=1.7.0';
+import {finish} from './mech-surface.js?v=1.8.0';
 
 const cache=new Map();
 let compact=false;
