@@ -1,4 +1,4 @@
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 export const MAKERS = [
   {id:'KAS',name:'カサネ重工',color:0x9ca4a7,accent:0xffbd69,shape:0,hp:1.08,weight:1.05,precision:1.0,power:1.0,tech:1.0,desc:'堅実な装甲と扱いやすい制御系'},
   {id:'VLT',name:'ヴォルト工廠',color:0x677b93,accent:0x7fcfff,shape:1,hp:.91,weight:.89,precision:1.08,power:.97,tech:1.1,desc:'軽量・高精度。電力効率を重視'},

@@ -5,8 +5,20 @@ export function flattenRigidGroups(parent){
   for(const child of [...parent.children])if(child.isGroup){
     flattenRigidGroups(child);
     if(child.userData.articulated)continue;
-    child.updateMatrix();
-    for(const object of [...child.children]){object.applyMatrix4(child.matrix);parent.add(object);}
+    if(child.matrixAutoUpdate)child.updateMatrix();
+    for(const object of [...child.children]){
+      // Bake rigid vertices rather than decomposing a sheared matrix into TRS.
+      // Animated exhaust retains its transform and the existing animation handle.
+      if(object.isMesh&&!object.userData.animated){
+        object.updateMatrix();
+        const previous=object.geometry;
+        object.geometry=previous.clone().applyMatrix4(child.matrix.clone().multiply(object.matrix));
+        object.geometry.userData.owned=true;
+        if(previous.userData.owned)previous.dispose();
+        object.position.set(0,0,0);object.quaternion.identity();object.scale.set(1,1,1);object.updateMatrix();
+      }else object.applyMatrix4(child.matrix);
+      parent.add(object);
+    }
     parent.remove(child);
   }
 }

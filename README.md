@@ -4,7 +4,9 @@
 
 [ゲームを遊ぶ](https://mech-battle-iron-salvage.yzgame.chatgpt.site)
 
-![見本と修正前後の比率比較（正投影・CPU描画）](docs/a11-ratio-v1.6.jpg)
+![見本と修正前後の形状比較（正投影・CPU描画）](docs/a11-shape-front-v1.7.jpg)
+
+1.7：22部位・正面と側面の輪郭354頂点から装甲を立体化。572項目で形状を再計測し、面取り・重ね板・関節カバーを追加。[形状比較と限界](docs/shapes-v1.7.md)。
 
 1.6：見本の頭頂〜足裏を100%として、頭の幅・高さ・奥行き、肩・胸・骨盤の幅と6か所の関節位置を計測し校正。[計測表と定義](docs/proportions-v1.6.md)。
 

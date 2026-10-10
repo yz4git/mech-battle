@@ -27,11 +27,11 @@ export class SoftwareShadow{
       }
     });
   }
-  visibility(x,y,z){
+  visibility(x,y,z,bias=.0045){
     const size=this.size,xx=(x*.5+.5)*size,yy=(-y*.5+.5)*size;
     if(xx<1||yy<1||xx>=size-2||yy>=size-2)return 1;
     const ix=Math.floor(xx),iy=Math.floor(yy),d=this.depth;let hits=0;
-    for(const dx of [-1,1])for(const dy of [-1,1])if(z-.0045<=d[(iy+dy)*size+ix+dx])hits++;
+    for(const dx of [-1,1])for(const dy of [-1,1])if(z-bias<=d[(iy+dy)*size+ix+dx])hits++;
     return .48+hits*.13;
   }
 }

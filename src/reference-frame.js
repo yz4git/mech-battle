@@ -1,9 +1,10 @@
 import * as T from '../vendor/three.module.min.js';
-import {MAKERS} from './parts.js?v=1.6.0';
-import {finish,palette} from './mech-surface.js?v=1.6.0';
-import {block,cyl,ring,bar,piston,bolts,vent,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.6.0';
-import {makeWeapon} from './mech-weapons.js?v=1.6.0';
-import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.6.0';
+import {MAKERS} from './parts.js?v=1.7.0';
+import {finish,palette} from './mech-surface.js?v=1.7.0';
+import {block,cyl,ring,bar,piston,bolts,vent,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.7.0';
+import {makeWeapon} from './mech-weapons.js?v=1.7.0';
+import {refineA11,compareA11Nodes} from './a11-outlines.js?v=1.7.0';
+import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.7.0';
 
 // Dedicated A-11 control contours: no shared octagonal armor silhouette.
 // XY is front elevation. Each contour is counter-clockwise; Z builds the actual side volume.
@@ -37,6 +38,7 @@ function remapY(y,knots){
 // Deform rigid surfaces in joint-local space before batching. Weapon geometry keeps
 // its own scale and muzzle coordinates; only its attachment position is moved.
 function fitSegments(joint,knots,excluded=[]){
+ excluded=[...excluded,...joint.children.filter(g=>g.userData.rigidJoint)];
  joint.updateWorldMatrix(true,true);const inverse=joint.matrixWorld.clone().invert();
  joint.traverse(mesh=>{
   if(!mesh.isMesh||excluded.some(g=>{for(let o=mesh;o;o=o.parent)if(o===g)return true;return false;}))return;
@@ -51,7 +53,7 @@ function measurements(root,torso,arms,legs,calibrated){
  root.updateMatrixWorld(true);const boxes={};
  root.traverse(m=>{if(!m.isMesh||!m.name.startsWith('measure:'))return;const key=m.name.slice(8),b=new T.Box3().setFromObject(m,true);(boxes[key]??=new T.Box3()).union(b);});
  const floor=boxes.foot.min.y,top=boxes.helmet.max.y,height=top-floor;
- const headBox=boxes.head.clone().union(boxes.helmet);
+ const headBox=(boxes.head??boxes.helmet).clone().union(boxes.helmet);boxes.head??=headBox;
  const point=(joint,y)=>new T.Vector3(0,y,0).applyMatrix4(joint.matrixWorld).y;
  const norm=y=>(y-floor)/height*100,width=key=>(boxes[key].max.x-boxes[key].min.x)/height*100;
  return {height,floor,helmetTop:top,shoulderWidth:width('shoulder'),headWidth:width('head'),headHeight:(headBox.max.y-headBox.min.y)/height*100,headDepth:(headBox.max.z-headBox.min.z)/height*100,chestWidth:width('chest'),pelvisWidth:width('pelvis'),
@@ -77,9 +79,11 @@ export function a11Plate(parent,shape,w,h,d,x,y,z,color,{slope=0,bevel=.045,tape
  const mesh=new T.Mesh(shapes.get(key),finish(color));mesh.position.set(x,y,z);mesh.castShadow=mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
 function hinge(parent,x,y,z,r,w,c){
- cyl(parent,r,w,x,y,z,c.black,'x',r,'rubber');
- for(const s of [-1,1]){cyl(parent,r*.82,.027,x+s*(w/2+.015),y,z,c.steel,'x');ring(parent,r*.68,.018,x+s*(w/2+.035),y,z,c.frame,'x');cyl(parent,r*.35,.034,x+s*(w/2+.05),y,z,c.black,'x');}
+ const joint=group(parent,x,y,z);joint.userData.rigidJoint=true;
+ cyl(joint,r,w,0,0,0,c.black,'x',r,'rubber');
+ for(const s of [-1,1]){cyl(joint,r*.82,.027,s*(w/2+.015),0,0,c.steel,'x');ring(joint,r*.68,.018,s*(w/2+.035),0,0,c.frame,'x');cyl(joint,r*.35,.034,s*(w/2+.05),0,0,c.black,'x');}
 }
+
 function led(parent,w,h,x,y,z,accent){
  block(parent,w+.06,h+.06,.048,x,y,z-.015,0x0c1116,'rubber');
  const m=block(parent,w,h,.012,x,y,z+.017,accent,'light');m.material=finish(accent,'sensor');return m;
@@ -107,46 +111,49 @@ function referenceFoot(parent,c,accent,s){
  const heel=group(g,0,.22,-.49);heel.rotation.y=Math.PI;a11Plate(heel,'rect',.56,.36,.13,0,0,0,c.paint);led(heel,.29,.052,0,.05,.1,accent);
  g.traverse(m=>{if(m.isMesh)m.name='measure:foot';});return g;
 }
-function referenceLeg(root,s,cy,p,c,accent){
+function referenceLeg(root,s,cy,p,c,accent,nodes){
  const leg=group(root,s*.61,cy-1.22,0);leg.rotation.z=s*.2;
- hinge(leg,0,0,0,.22,.49,c);block(leg,.34,.9,.38,0,-.56,-.07,c.frame);
- const thigh=a11Plate(leg,'thigh',.67,1.03,.3,-s*.025,-.52,.2,c.shade,{slope:-.09});thigh.rotation.z=s*.06;
- a11Plate(leg,'thigh',.58,.88,.055,-s*.025,-.5,.385,c.paint,{slope:-.09});
- block(leg,.37,.075,.045,0,-.07,.355,c.frame);
- bolts(leg,.32,.69,-s*.025,-.52,.36);block(leg,.32,.045,.04,0,-.86,.368,c.shade);
- const thighBack=group(leg,0,-.54,-.26);thighBack.rotation.y=Math.PI;a11Plate(thighBack,'thigh',.48,.81,.17,0,0,0,c.paint);vent(thighBack,.22,.12,0,-.22,.1);
- piston(leg,[s*.22,-.13,-.2],[s*.27,-1,-.27],.052);
+ hinge(leg,0,0,0,.22,.49,c);const thighGroup=group(leg);nodes[s<0?'thighL':'thighR']=thighGroup;block(thighGroup,.34,.9,.38,0,-.56,-.07,c.frame);
+ const thigh=a11Plate(thighGroup,'thigh',.67,1.03,.3,-s*.025,-.52,.2,c.shade,{slope:-.09});thigh.rotation.z=s*.06;
+ a11Plate(thighGroup,'thigh',.58,.88,.055,-s*.025,-.5,.385,c.paint,{slope:-.09});
+ block(thighGroup,.37,.075,.045,0,-.07,.355,c.frame);
+ bolts(thighGroup,.32,.69,-s*.025,-.52,.36);block(thighGroup,.32,.045,.04,0,-.86,.368,c.shade);
+ const thighBack=group(thighGroup,0,-.54,-.26);thighBack.rotation.y=Math.PI;a11Plate(thighBack,'thigh',.48,.81,.17,0,0,0,c.paint);vent(thighBack,.22,.12,0,-.22,.1);
+ piston(thighGroup,[s*.22,-.13,-.2],[s*.27,-1,-.27],.052);
  hinge(leg,0,-1.15,.015,.21,.69,c);
- const knee=a11Plate(leg,'knee',.55,.48,.32,0,-1.12,.3,c.light,{slope:-.21});knee.rotation.x=-.1;
- led(leg,.25,.042,0,-1.24,.49,accent);bolts(leg,.26,.2,0,-1.1,.49);
+ const kneeGroup=group(leg);nodes[s<0?'kneeL':'kneeR']=kneeGroup;
+ const knee=a11Plate(kneeGroup,'knee',.55,.48,.32,0,-1.12,.3,c.light,{slope:-.21});knee.rotation.x=-.1;
+ led(kneeGroup,.25,.042,0,-1.24,.49,accent);bolts(kneeGroup,.26,.2,0,-1.1,.49);
+ const shinGroup=group(leg);nodes[s<0?'shinL':'shinR']=shinGroup;shinGroup.userData.partArmor=p.armorLegs;
  // Recessed tibia; outer calf housing has a separate scalloped silhouette and axle discs.
- block(leg,.33,1.05,.38,0,-1.83,-.015,c.frame);
- const shin=a11Plate(leg,'shin',.77,1.07,.28,-s*.055,-1.82,.245,c.shade,{slope:.17});shin.rotation.z=-s*.055;
- a11Plate(leg,'shin',.59,.88,.055,-s*.055,-1.79,.435,c.paint,{slope:.17});
- bolts(leg,.26,.67,-s*.07,-1.81,.412);
- const calf=group(leg,s*.3,-1.78,-.11);calf.rotation.y=s*Math.PI/2;
+ block(shinGroup,.33,1.05,.38,0,-1.83,-.015,c.frame);
+ const shin=a11Plate(shinGroup,'shin',.77,1.07,.28,-s*.055,-1.82,.245,c.shade,{slope:.17});shin.rotation.z=-s*.055;
+ a11Plate(shinGroup,'shin',.59,.88,.055,-s*.055,-1.79,.435,c.paint,{slope:.17});
+ bolts(shinGroup,.26,.67,-s*.07,-1.81,.412);
+ const calf=group(shinGroup,s*.3,-1.78,-.11);calf.rotation.y=s*Math.PI/2;
  a11Plate(calf,'calfSide',.88,.99,.21,0,0,0,c.paint,{slope:.08});
  a11Plate(calf,'rect',.28,.3,.06,.18,.23,.135,c.light);warnings(calf,.15,.21,.18);
  for(const [y,r] of [[-.03,.19],[.35,.12]]){cyl(calf,r,.046,-.17,y,.14,c.black,'z',r,'rubber');ring(calf,r*.86,.019,-.17,y,.177,c.steel);cyl(calf,r*.48,.018,-.17,y,.197,c.frame,'z');}
- const rear=group(leg,0,-1.83,-.37);rear.rotation.y=Math.PI;a11Plate(rear,'shin',.45,.77,.13,0,0,0,c.paint);vent(rear,.2,.17,0,.12,.085);
- piston(leg,[s*.27,-1.29,-.24],[s*.26,-2.29,-.33],.058);
- hinge(leg,0,-2.31,-.06,.165,.54,c);a11Plate(leg,'ankle',.5,.32,.23,0,-2.31,.19,c.paint);
- moduleArmor(leg,p.armorLegs,.23,.31,-s*.08,-1.68,.432,c);leg.userData.foot=referenceFoot(leg,c,accent,s);return leg;
+ const rear=group(shinGroup,0,-1.83,-.37);rear.rotation.y=Math.PI;a11Plate(rear,'shin',.45,.77,.13,0,0,0,c.paint);vent(rear,.2,.17,0,.12,.085);
+ piston(shinGroup,[s*.27,-1.29,-.24],[s*.26,-2.29,-.33],.058);
+ hinge(leg,0,-2.31,-.06,.165,.54,c);const ankleGroup=group(leg);nodes[s<0?'ankleL':'ankleR']=ankleGroup;a11Plate(ankleGroup,'ankle',.5,.32,.23,0,-2.31,.19,c.paint);
+ moduleArmor(leg,p.armorLegs,.23,.31,-s*.08,-1.68,.432,c);leg.userData.foot=referenceFoot(leg,c,accent,s);nodes[s<0?'bootL':'bootR']=leg.userData.foot;return leg;
 }
-export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrated=true){
+export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrated=true,detailed=true,captureComparison=false){
  setGeometryDetail(reduced);
  const root=new T.Group(),cy=4.07,heavy=p.body.kind==='bulwark',recon=p.body.kind==='wraith',sx=heavy?1.16:recon?.9:1;
  const colors=part=>palette(paints[paint]?.color??MAKERS[part.maker].color),c=colors(p.body),accent=enemy?0xff7834:0xff8b22;
- const torso=group(root,0,cy,0),arms={},guns={},shoulders={},legs=[],jets=[];
+ const nodes={},torso=group(root,0,cy,0),arms={},guns={},shoulders={},legs=[],jets=[];
  // Upper torso is a sloping wedge, not a flat box. Leave dark undercuts beneath the breast armor.
  block(torso,1.24*sx,.89,.66,0,.08,-.11,c.frame);
  block(torso,.55,.46,.46,0,-.69,-.015,c.black,'rubber');
  for(let i=0;i<3;i++)block(torso,.54-i*.035,.055,.53,0,-.55-i*.13,.02,c.frame);
- const middle=a11Plate(torso,'sternum',.84*sx,1.02,.3,0,.04,.46,c.shade,{slope:-.23});middle.name='measure:chest';
- a11Plate(torso,'sternum',.77*sx,.53,.09,0,.31,.59,c.paint,{slope:-.23});
- a11Plate(torso,'rect',.34,.33,.065,0,-.23,.684,c.shade,{slope:-.23});
+ const core=group(torso);nodes.sternum=core;core.userData.partArmor=p.armorBody;
+ const middle=a11Plate(core,'sternum',.84*sx,1.02,.3,0,.04,.46,c.shade,{slope:-.23});middle.name='measure:chest';
+ a11Plate(core,'sternum',.77*sx,.53,.09,0,.31,.59,c.paint,{slope:-.23});
+ a11Plate(core,'rect',.34,.33,.065,0,-.23,.684,c.shade,{slope:-.23});
  for(const s of [-1,1]){
-  const breast=group(torso,s*.53*sx,.14,.18);breast.rotation.y=s*.19;
+  const breast=group(torso,s*.53*sx,.14,.18);breast.rotation.y=s*.19;nodes[s<0?'breastL':'breastR']=breast;
   a11Plate(breast,'breast',.89*sx,.96,.5,0,0,0,c.paint,{slope:-.32}).name='measure:chest';
   // Narrow raised top panel follows the same rake as the breast plane.
   a11Plate(breast,'breast',.76*sx,.3,.035,0,-.28,.368,c.shade,{slope:-.32});
@@ -164,7 +171,7 @@ export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrat
  }
  const chestObjects=[...torso.children];
  // Helmet: long brow, recessed amber slit, separate cheek guards and pointed chin.
- cyl(torso,.125,.21,0,.67,-.06,c.steel);const head=group(torso,0,.98,-.025);
+ cyl(torso,.125,.21,0,.67,-.06,c.steel);const head=group(torso,0,.98,-.025);nodes.helmet=head;
  a11Plate(head,'helmet',.62,.56,.46,0,.035,-.08,c.paint,{slope:-.3}).name='measure:helmet';
  block(head,.4,.115,.1,0,-.047,.21,c.black,'rubber');led(head,.36,.037,0,-.04,.269,accent);
  const brow=a11Plate(head,'rect',.48,.13,.27,0,.084,.2,c.light,{slope:-.36});brow.rotation.x=.14;
@@ -177,7 +184,7 @@ export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrat
  head.traverse(m=>{if(m.isMesh&&m.name!=='measure:helmet')m.name='measure:head';});
  bar(head,[.12,.25,-.17],[.17,1.18,-.25],.013,c.steel);a11Plate(head,'rect',.13,.2,.24,.12,.28,-.16,c.paint);bolts(head,.32,.13,0,.2,.135);
  // Rectangular rear engine plate and two tall glowing radiator channels.
- const ec=colors(p.engine),back=group(torso,0,.09,-.63);
+ const ec=colors(p.engine),back=group(torso,0,.09,-.63);nodes.back=back;back.userData.colors=ec;
  block(back,.87,1.02,.39,0,0,-.08,ec.frame);const backFace=group(back,0,0,-.32);backFace.rotation.y=Math.PI;
  a11Plate(backFace,'rect',.77,.94,.15,0,0,0,ec.paint);a11Plate(backFace,'rect',.33,.46,.09,0,-.22,.12,ec.shade);
  bolts(backFace,.55,.63,0,0,.104);warnings(backFace,0,.2,.11,.8);
@@ -194,7 +201,7 @@ export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrat
   const ap=p[slot],ac=colors(ap),anvil=ap.kind==='anvil',precision=ap.kind==='scope',aw=anvil?1.18:precision?.89:1;
   const arm=group(torso,s*(.94*sx+.26),.35,-.045);arms[slot]=arm;
   hinge(arm,0,0,0,.245,.57,ac);
-  const cap=group(arm,s*.2,.15,-.01);cap.rotation.z=-s*.16;
+  const cap=group(arm,s*.2,.15,-.01);cap.rotation.z=-s*.16;nodes[s<0?'shoulderL':'shoulderR']=cap;cap.userData.partWidth=aw;cap.userData.colors=ac;
   a11Plate(cap,'shoulder',.91*aw,.69,.67,0,0,0,ac.paint,{slope:-.18}).name='measure:shoulder';
   // One continuous shoulder face; the seam stays at its edge instead of nested octagons.
   bolts(cap,.54,.35,0,.02,.36);decal(cap,s<0?'07':'03',.31,.22,s*.03,.025,.355);warnings(cap,-s*.27,.08,.341,.55);
@@ -206,13 +213,14 @@ export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrat
   const upperBack=group(arm,0,-.49,-.19);upperBack.rotation.y=Math.PI;a11Plate(upperBack,'thigh',.32,.5,.12,0,0,0,ac.paint);
   piston(arm,[s*.2,-.24,-.19],[s*.19,-.85,-.18],.048);
   hinge(arm,0,-.97,.035,.18,.46,ac);
-  block(arm,.28,.72,.32,0,-1.43,.055,ac.frame);
-  a11Plate(arm,'forearm',.57*aw,.84,.38,0,-1.43,.19,ac.shade,{slope:.12});
-  a11Plate(arm,'forearm',.48*aw,.7,.055,0,-1.41,.401,ac.paint,{slope:.12});
-  a11Plate(arm,'rect',.31,.35,.055,-s*.035,-1.48,.399,ac.light);bolts(arm,.26,.52,0,-1.44,.419);
-  const foreSide=group(arm,s*.26*aw,-1.43,.025);foreSide.rotation.y=s*Math.PI/2;a11Plate(foreSide,'forearm',.39,.72,.12,0,0,0,ac.paint);vent(foreSide,.16,.2,0,-.1,.085);
-  const foreBack=group(arm,0,-1.44,-.18);foreBack.rotation.y=Math.PI;a11Plate(foreBack,'forearm',.4,.68,.15,0,0,0,ac.paint);a11Plate(foreBack,'rect',.22,.23,.04,0,.09,.103,ac.light);
-  moduleArmor(arm,p[slot==='armL'?'armorArmL':'armorArmR'],.24,.32,0,-1.42,.437,ac);
+  const fore=group(arm);nodes[s<0?'forearmL':'forearmR']=fore;fore.userData.colors=ac;fore.userData.partWidth=aw;fore.userData.partArmor=p[slot==='armL'?'armorArmL':'armorArmR'];
+  block(fore,.28,.72,.32,0,-1.43,.055,ac.frame);
+  a11Plate(fore,'forearm',.57*aw,.84,.38,0,-1.43,.19,ac.shade,{slope:.12});
+  a11Plate(fore,'forearm',.48*aw,.7,.055,0,-1.41,.401,ac.paint,{slope:.12});
+  a11Plate(fore,'rect',.31,.35,.055,-s*.035,-1.48,.399,ac.light);bolts(fore,.26,.52,0,-1.44,.419);
+  const foreSide=group(fore,s*.26*aw,-1.43,.025);foreSide.rotation.y=s*Math.PI/2;a11Plate(foreSide,'forearm',.39,.72,.12,0,0,0,ac.paint);vent(foreSide,.16,.2,0,-.1,.085);
+  const foreBack=group(fore,0,-1.44,-.18);foreBack.rotation.y=Math.PI;a11Plate(foreBack,'forearm',.4,.68,.15,0,0,0,ac.paint);a11Plate(foreBack,'rect',.22,.23,.04,0,.09,.103,ac.light);
+  moduleArmor(fore,p[slot==='armL'?'armorArmL':'armorArmR'],.24,.32,0,-1.42,.437,ac);
   cyl(arm,.115,.2,0,-1.94,.07,ac.steel);block(arm,.29,.25,.3,0,-2.05,.1,ac.black,'rubber');
   for(let i=0;i<4;i++){a11Plate(arm,'rect',.059,.16,.095,-.105+i*.07,-2.16,.22,ac.paint);block(arm,.059,.09,.11,-.105+i*.07,-2.25,.14,ac.frame);}
   a11Plate(arm,'rect',.078,.16,.13,-s*.19,-2.1,.19,ac.paint);
@@ -220,14 +228,15 @@ export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrat
   const ss=s<0?'shoulderL':'shoulderR';if(p[ss]){const pod=group(torso,s*(.94*sx+.23),p[ss].kind==='missile'?.7:1.05,-.77);shoulders[ss]=pod;hinge(pod,0,0,0,.15,.29,ac);block(pod,.23,.27,.27,0,.13,0,ac.frame);const w=makeWeapon(pod,p[ss],accent);w.position.y=p[ss].kind==='missile'?.35:.49;if(p[ss].kind==='missile')w.scale.setScalar(.82);guns[ss]=w;}
  }
  const hips=group(root,0,cy-1.12,0),lc=colors(p.legs);
- block(hips,.85,.37,.59,0,.065,-.015,c.frame);
- a11Plate(hips,'sternum',.58,.71,.22,0,-.13,.32,c.shade,{slope:.12});
- a11Plate(hips,'rect',.28,.24,.075,0,.17,.483,0xb77b38);led(hips,.19,.037,0,.2,.538,accent);
+ const pelvis=group(hips);nodes.pelvis=pelvis;
+ block(pelvis,.85,.37,.59,0,.065,-.015,c.frame);
+ a11Plate(pelvis,'sternum',.58,.71,.22,0,-.13,.32,c.shade,{slope:.12});
+ a11Plate(pelvis,'rect',.28,.24,.075,0,.17,.483,0xb77b38);led(pelvis,.19,.037,0,.2,.538,accent);
  for(const s of [-1,1]){
-  const skirt=group(hips,s*.41,-.1,.15);skirt.rotation.y=s*.21;skirt.rotation.z=s*.13;a11Plate(skirt,'skirt',.62,.59,.22,0,0,0,c.paint,{slope:.16});bolts(skirt,.32,.31,0,0,.159);
+  const skirt=group(hips,s*.41,-.1,.15);skirt.rotation.y=s*.21;skirt.rotation.z=s*.13;nodes[s<0?'skirtL':'skirtR']=skirt;a11Plate(skirt,'skirt',.62,.59,.22,0,0,0,c.paint,{slope:.16});bolts(skirt,.32,.31,0,0,.159);
   const side=group(hips,s*.63,-.07,-.03);side.rotation.y=s*Math.PI/2;a11Plate(side,'skirt',.57,.46,.17,0,0,0,c.paint);
   const rear=group(hips,s*.34,-.09,-.35);rear.rotation.y=Math.PI;a11Plate(rear,'skirt',.47,.47,.12,0,0,0,c.paint);
-  legs.push(referenceLeg(root,s,cy,p,lc,accent));
+  legs.push(referenceLeg(root,s,cy,p,lc,accent,nodes));
  }
  hips.traverse(m=>{if(m.isMesh)m.name='measure:pelvis';});
  if(calibrated){
@@ -241,7 +250,15 @@ export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrat
   for(const pod of Object.values(shoulders))pod.scale.x=1/k.torsoWidth;
  }
  root.userData={torso,arms,guns,shoulders,legs,jets,tank:false,quad:false,reverse:false,accent,cy,build,phase:0,referenceFrame:true};
+ const datum=measurements(root,torso,arms,legs,calibrated),ctx={floor:datum.floor,unit:datum.height/573};
+ if(calibrated&&detailed){
+  arms.armL.position.x=-1.4*sx;arms.armR.position.x=1.5*sx;arms.armL.rotation.z=-.08;arms.armR.rotation.z=.11;
+  for(const child of [...hips.children])if(!Object.values(nodes).includes(child))hips.remove(child);
+  refineA11(nodes,ctx,c,accent,sx);
+  for(const [slot,pod]of Object.entries(shoulders)){if(p[slot]?.kind==='missile'){pod.position.x=Math.sign(pod.position.x)*1.63*sx;pod.position.z=-.91;const w=guns[slot];w.position.y=.39;w.scale.set(.52,.47,.55);}}
+ }
  root.userData.proportions=measurements(root,torso,arms,legs,calibrated);
+ if(captureComparison)root.userData.referenceComparison=compareA11Nodes(nodes,ctx);
  for(const g of [torso,...Object.values(arms),...Object.values(guns),...Object.values(shoulders),...legs])g.userData.articulated=true;
  flattenRigidGroups(root);batchRigidMeshes(root);
  const local=new Map();root.traverse(o=>{if(!o.isMesh||o.material.userData.shared||o.material.isMeshBasicMaterial)return;let m=local.get(o.material);if(!m){m=o.material.clone();m.userData.baseEmissive=m.emissive.clone();m.userData.baseIntensity=m.emissiveIntensity;local.set(o.material,m);}o.material=m;});root.userData.materials=[...local.values()];setGeometryDetail(false);return root;

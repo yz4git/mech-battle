@@ -11,7 +11,7 @@ const width=k=>(pixels[k][1]-pixels[k][0])/h*100,y=k=>(pixels.sole-pixels[k])/h*
 const reference={headWidth:width('head'),headHeight:(pixels.chin-pixels.helmetTop)/h*100,headDepth:width('headSide'),shoulderWidth:width('shoulder'),chestWidth:width('chest'),pelvisWidth:width('pelvis'),
  shoulderHeight:y('shoulderY'),elbowHeight:y('elbowY'),wristHeight:y('wristY'),hipHeight:y('hipY'),kneeHeight:y('kneeY'),ankleHeight:y('ankleY')};
 const b=starterLoadout(),p=Object.fromEntries(Object.entries(b).map(([k,v])=>[k,getPart(v)]));
-const measure=fit=>createReferenceFrame(b,p,1,false,[{color:null},{color:0xb7b9b5}],false,fit).userData.proportions;
+const measure=fit=>createReferenceFrame(b,p,1,false,[{color:null},{color:0xb7b9b5}],false,fit,false).userData.proportions;
 const before=measure(false),after=measure(true),report={pixels,reference,before,after,uncertaintyPercent:5/h*100};
 if(process.argv[2])writeFileSync(process.argv[2],JSON.stringify(report,null,2)+'\n');
 console.table(Object.keys(reference).map(k=>({metric:k,reference:reference[k].toFixed(2),before:before[k].toFixed(2),after:after[k].toFixed(2),errorBefore:Math.abs(before[k]-reference[k]).toFixed(2),errorAfter:Math.abs(after[k]-reference[k]).toFixed(2)})));

@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import {SoftwareShadow} from './software-shadow.js?v=1.6.0';
+import {SoftwareShadow} from './software-shadow.js?v=1.7.0';
 
 // Bounded-resolution, depth-buffered fallback. Uses exactly the gameplay meshes.
 // It stays idle in the garage; transparent surfaces depth-test without depth-writing.
@@ -41,7 +41,7 @@ export class SoftwareRenderer{
         const points=poly.map(v=>[(v[0]/v[3]*.5+.5)*w,(-v[1]/v[3]*.5+.5)*h,v[2]/v[3],1/v[3],v[4]/v[3],v[5]/v[3],v[6]/v[3],v[7]/v[3],v[8]/v[3]]);
         const tex=this.texture(m.map);
         for(let k=1;k<points.length-1;k++){
-          const tri={points:[points[0],points[k],points[k+1]],shade,m,tex,alpha:vc?.itemSize===4?vc.getW(ids[0]):1,depth:poly.reduce((n,v)=>n+v[3],0)/poly.length};
+          const tri={points:[points[0],points[k],points[k+1]],shade,m,tex,shadowBias:.0045+.012*(1-Math.abs(this.normal.dot(this.light))),alpha:vc?.itemSize===4?vc.getW(ids[0]):1,depth:poly.reduce((n,v)=>n+v[3],0)/poly.length};
           if(m.transparent)transparent.push(tri);else this.triangle(tri,w,h,background,scene.fog);
         }
       }
@@ -49,7 +49,7 @@ export class SoftwareRenderer{
     transparent.sort((a,b)=>b.depth-a.depth);for(const tri of transparent)this.triangle(tri,w,h,background,scene.fog);
     ctx.putImageData(this.frame,0,0);this.domElement.dataset.renderMs=(performance.now()-started).toFixed(1);
   }
-  triangle({points:[a,b,c],shade,m,tex,depth,alpha:vertexAlpha=1},w,h,bg,fog){
+  triangle({points:[a,b,c],shade,m,tex,depth,shadowBias=.0045,alpha:vertexAlpha=1},w,h,bg,fog){
     const area=(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);if(Math.abs(area)<.01||area>=0&&m.side!==T.DoubleSide)return;
     const minX=Math.max(0,Math.floor(Math.min(a[0],b[0],c[0]))),maxX=Math.min(w-1,Math.ceil(Math.max(a[0],b[0],c[0]))),minY=Math.max(0,Math.floor(Math.min(a[1],b[1],c[1]))),maxY=Math.min(h-1,Math.ceil(Math.max(a[1],b[1],c[1])));
     const ax=(b[1]-c[1])/area,ay=(c[0]-b[0])/area,bx=(c[1]-a[1])/area,by=(a[0]-c[0])/area;
@@ -62,7 +62,7 @@ export class SoftwareRenderer{
         const t=1-u-v;if(u<-.00001||v<-.00001||t<-.00001)continue;
         const z=u*a[2]+v*b[2]+t*c[2],pixel=y*w+x;if(z>this.depth[pixel]+.000001)continue;
         let rr=r,gg=g,bb=blue,alpha=(m.opacity??1)*vertexAlpha;const iw=u*a[3]+v*b[3]+t*c[3];
-        if(!m.isMeshBasicMaterial){const shadow=this.shadows.visibility((u*a[6]+v*b[6]+t*c[6])/iw,(u*a[7]+v*b[7]+t*c[7])/iw,(u*a[8]+v*b[8]+t*c[8])/iw);rr*=shadow;gg*=shadow;bb*=shadow;}
+        if(!m.isMeshBasicMaterial){const shadow=this.shadows.visibility((u*a[6]+v*b[6]+t*c[6])/iw,(u*a[7]+v*b[7]+t*c[7])/iw,(u*a[8]+v*b[8]+t*c[8])/iw,shadowBias);rr*=shadow;gg*=shadow;bb*=shadow;}
         if(tex){const tu=(u*a[4]+v*b[4]+t*c[4])/iw,tv=(u*a[5]+v*b[5]+t*c[5])/iw;
           const repeat=m.map.repeat,tx=((tu*repeat.x)%1+1)%1,ty=((tv*repeat.y)%1+1)%1,ti=(Math.min(tex.height-1,Math.floor((1-ty)*tex.height))*tex.width+Math.min(tex.width-1,Math.floor(tx*tex.width)))*4;
           rr*=tex.data[ti]/255;gg*=tex.data[ti+1]/255;bb*=tex.data[ti+2]/255;alpha*=tex.data[ti+3]/255;
