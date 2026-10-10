@@ -18,6 +18,7 @@ function surface(){
 export function finish(color,kind='paint'){
   const key=`${color}:${kind}`;
   if(!materials.has(key)){
+    if(kind==='sensor'){const m=new T.MeshBasicMaterial({color});m.userData.shared=true;materials.set(key,m);return m;}
     const glow=kind==='light',metal=kind==='metal',rubber=kind==='rubber';
     const map=!glow&&!rubber?(surface()||null):null;
     const material=new T.MeshStandardMaterial({color,metalness:glow?.15:metal?.86:rubber?.12:.28,roughness:glow?.23:metal?.3:rubber?.85:.52,map,bumpMap:map?bump:null,bumpScale:metal?.003:.004,roughnessMap:map?bump:null,emissive:glow?color:0,emissiveIntensity:glow?1.35:0});

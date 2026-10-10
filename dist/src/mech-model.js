@@ -1,9 +1,10 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.4.0';
-import {palette} from './mech-surface.js?v=1.4.0';
-import {panel,shell,block,cyl,ring,bar,piston,bolts,vent,light,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.4.0';
-import {makeWeapon} from './mech-weapons.js?v=1.4.0';
-import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.4.0';
+import {getPart,MAKERS} from './parts.js?v=1.5.0';
+import {palette} from './mech-surface.js?v=1.5.0';
+import {panel,shell,block,cyl,ring,bar,piston,bolts,vent,light,cable,decal,setGeometryDetail} from './mech-geometry.js?v=1.5.0';
+import {makeWeapon} from './mech-weapons.js?v=1.5.0';
+import {batchRigidMeshes,flattenRigidGroups} from './mesh-batch.js?v=1.5.0';
+import {createReferenceFrame} from './reference-frame.js?v=1.5.0';
 
 function group(parent,x=0,y=0,z=0){const g=new T.Group();g.position.set(x,y,z);parent.add(g);return g;}
 function joint(parent,x,y,z,r,width){
@@ -68,6 +69,7 @@ function legDetail(leg,c,armor,side,accent){
 export function createMech(build,paint,enemy,paints,reduced=false){
   setGeometryDetail(reduced);
   const root=new T.Group(),p=Object.fromEntries(Object.entries(build).map(([k,v])=>[k,getPart(v)]));
+  if(p.legs.kind==='biped')return createReferenceFrame(build,p,paint,enemy,paints,reduced);
   const maker=MAKERS[p.body.maker],color=paints[paint]?.color??maker.color,c=palette(color),accent=enemy?0xff7951:0xff9e3e;
   const tank=p.legs.kind==='tank',quad=p.legs.kind==='quad',reverse=p.legs.kind==='reverse',heavy=p.body.id.includes('-BW-'),recon=p.body.id.includes('-WR-');
   const cy=tank?3.4:quad?3.25:4.07,width=heavy?2.05:recon?1.5:1.77;

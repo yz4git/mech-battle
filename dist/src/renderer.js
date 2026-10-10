@@ -1,10 +1,10 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.4.0';
-import {COVERS} from './simulation.js?v=1.4.0';
-import {batchRigidMeshes} from './mesh-batch.js?v=1.4.0';
-import {createMech} from './mech-model.js?v=1.4.0';
-import {SoftwareRenderer} from './software-renderer.js?v=1.4.0';
-import {CombatEffects} from './combat-effects.js?v=1.4.0';
+import {getPart,MAKERS} from './parts.js?v=1.5.0';
+import {COVERS} from './simulation.js?v=1.5.0';
+import {batchRigidMeshes} from './mesh-batch.js?v=1.5.0';
+import {createMech} from './mech-model.js?v=1.5.0';
+import {SoftwareRenderer} from './software-renderer.js?v=1.5.0';
+import {CombatEffects} from './combat-effects.js?v=1.5.0';
 
 const geometries=new Map(),materials=new Map();
 const dark=0x20272a,joint=0x11191d,steel=0x79848a;
@@ -159,7 +159,7 @@ export class MechScene{
       d.jets.forEach(j=>{j.visible=u.boost>0;j.scale.y=1+Math.sin(this.time*55)*.22;});
     }else{
       d.torso.position.y=d.cy+Math.sin(this.time*1.4)*.009;d.arms.armL.rotation.x=-.035;d.arms.armR.rotation.x=-.035;
-      for(const slot of ['weaponL','weaponR'])if(d.guns[slot])d.guns[slot].rotation.x=d.tank?.025:d.quad?.28:.62;
+      for(const slot of ['weaponL','weaponR'])if(d.guns[slot])d.guns[slot].rotation.x=d.tank?.025:d.quad?.28:d.referenceFrame?1.16:.62;
     }
   }
   render(dt,b=null){if(this.contextLost||dt===0&&!this.dirty)return;const frozen=dt===0;this.time+=dt;
@@ -183,7 +183,7 @@ export class MechScene{
         if(p.kind==='missile'&&this.time-(m.userData.lastSmoke||0)>.055){m.userData.lastSmoke=this.time;this.fx.missileTrail(m.position);}
       }
     }
-    let target=new T.Vector3(0,this.holder.clientHeight<380?2.3:2.5,0),r=(11.1+Math.max(0,1.3-this.camera.aspect)*3.5)*this.zoom,height=5.15,angle=this.angle;
+    let target=new T.Vector3(0,this.holder.clientHeight<380?2.3:2.5,0),r=(11.1+Math.max(0,1.3-this.camera.aspect)*3.5)*this.zoom,height=this.mode==='hangar'?4.25:5.15,angle=this.angle;
     if(this.mode!=='hangar'){
       if(this.mode==='battle'&&b){const [a,c]=b.units;target.set((a.x+c.x)/2,1.8,(a.z+c.z)/2);const spread=Math.hypot(a.x-c.x,a.z-c.z);r=Math.max(14,spread*.58+8)+Math.max(0,1-this.camera.aspect)*4;height=this.cameraMode===1?32:Math.max(8,spread*.17+7);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI*.5+.24+this.angle-.52;
         if(this.cameraMode===2){target.y=2.6;r=Math.max(10,spread*.48+7);height=Math.max(6.8,spread*.12+5.5);angle=Math.atan2(c.x-a.x,c.z-a.z)+Math.PI*.64+this.angle-.52;}

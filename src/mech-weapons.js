@@ -1,11 +1,12 @@
 import * as T from '../vendor/three.module.min.js';
-import {MAKERS} from './parts.js?v=1.4.0';
-import {palette} from './mech-surface.js?v=1.4.0';
-import {panel,shell,block,cyl,ring,bolts,vent,light,decal} from './mech-geometry.js?v=1.4.0';
+import {MAKERS} from './parts.js?v=1.5.0';
+import {palette} from './mech-surface.js?v=1.5.0';
+import {panel,shell,block,cyl,ring,bolts,vent,light,decal} from './mech-geometry.js?v=1.5.0';
 
-export function makeWeapon(parent,p,accent){
+export function makeWeapon(parent,p,accent,options={}){
   const g=new T.Group();parent.add(g);if(!p)return g;
   const c=palette(MAKERS[p.maker].color),kind=p.kind;
+  if(options.reference&&kind!=='missile')Object.assign(c,{paint:0x4d5559,light:0x747b7e,shade:0x242c32,frame:0x171f26,steel:0x8e979b});
   if(kind==='missile'){
     shell(g,1.1,1.02,1.4,0,0,-.12,c.shade,'plate',.11);
     shell(g,1.17,1.03,.14,0,0,.61,c.paint,'plate',.09);
@@ -82,7 +83,11 @@ export function makeWeapon(parent,p,accent){
     cyl(g,radius*.96,.012,0,0,tip+.144,c.black,'z',radius*.96,'rubber');
     if(cannon)for(const s of [-1,1]){cyl(g,.071,1.73,s*.26,-.18,1.25,c.frame,'z');cyl(g,.035,1.14,s*.26,-.18,2.15,c.steel,'z');}
   }
-  for(let i=0;i<7;i++)block(g,.21,.029,.06,0,.327,-.06+i*.15,c.steel,'metal');
+  if(options.reference&&kind==='rifle'){
+    shell(g,.32,.26,1.64,0,.08,1.81,c.paint,'plate',.045);
+    block(g,.039,.025,1.37,-.12,.224,1.83,accent,'light');
+    for(const z of [.7,1.4,2.1])block(g,.37,.035,.045,0,.254,z,c.frame);
+  }else for(let i=0;i<7;i++)block(g,.21,.029,.06,0,.327,-.06+i*.15,c.steel,'metal');
   if(sniper){cyl(g,.11,.72,0,.44,.18,c.frame,'z');ring(g,.11,.018,0,.44,.56,c.steel);cyl(g,.077,.022,0,.44,.567,accent,'z',.077,'light');}
   else {panel(g,.13,.16,.21,0,.39,.05,c.frame);light(g,.045,.035,0,.39,.17,accent);}
   if(laser){for(const s of [-1,1]){panel(g,.15,.43,.95,s*.32,0,.49,c.paint);block(g,.025,.12,.65,s*.412,0,.49,accent,'light');}cyl(g,.07,.3,0,0,2.86,accent,'z',.07,'light');}
