@@ -1,4 +1,4 @@
-import {statsFor,getPart,missionInfo,enemyLoadout} from './parts.js?v=1.8.0';
+import {statsFor,getPart,missionInfo,enemyLoadout} from './parts.js?v=1.9.0';
 
 export function rngFrom(seed){let a=seed>>>0;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
@@ -10,7 +10,7 @@ export function createBattle(loadout,index,{seed=Date.now(),tactic='balanced',ta
   const makeUnit=(id,build,x,z,ai,aim)=>{
     const stats=statsFor(build);
     return {id,build:{...build},stats,x,z,vx:0,vz:0,yaw:id===0?0:Math.PI,health:{...stats.pools},energy:stats.energy,heat:0,stagger:0,stun:0,
-      dead:false,boost:0,move:0,tactic:ai,target:aim,firePose:{},weapons:stats.weapons.map(w=>({...w,cd:.3+random()*.8,ammo:w.part.ammo||Infinity})),damage:0,hits:0,shots:0,broken:[],armorFlash:0,weaponReport:Object.fromEntries(stats.weapons.map(w=>[w.slot,{shots:0,hits:0,damage:0}]))};
+      dead:false,boost:0,boostCooldown:.15+id*.2,dashX:0,dashZ:0,dashSide:id?1:-1,disengage:0,move:0,tactic:ai,target:aim,firePose:{},weapons:stats.weapons.map(w=>({...w,cd:.3+random()*.8,ammo:w.part.ammo||Infinity})),damage:0,hits:0,shots:0,broken:[],armorFlash:0,weaponReport:Object.fromEntries(stats.weapons.map(w=>[w.slot,{shots:0,hits:0,damage:0}]))};
   };
   const enemyTactic=index===0?'balanced':info.sector===5?'rush':info.sector===2?'fortress':info.sector===3?'kite':['balanced','rush','kite','fortress','balanced'][info.step];
   return {time:0,seed,index,random,units:[makeUnit(0,loadout,0,-12,tactic,target),makeUnit(1,enemy,0,12,enemyTactic,info.boss?'arms':'body')],projectiles:[],events:[],log:[],result:null,serial:0,info};
@@ -46,7 +46,8 @@ function move(b,u,enemy,dt){
   u.yaw=Math.atan2(dx,dz);
   u.stun=Math.max(0,u.stun-dt);u.heat=Math.max(0,u.heat-s.cooling*dt);u.energy=Math.min(s.energy,u.energy+s.regen*dt);u.stagger=Math.max(0,u.stagger-dt*12);
   u.armorFlash=Math.max(0,u.armorFlash-dt);for(const k in u.firePose)u.firePose[k]=Math.max(0,u.firePose[k]-dt);
-  if(u.dead||u.stun>0){u.move=0;u.vx=0;u.vz=0;u.boost=Math.max(0,u.boost-dt);return;}
+  u.boostCooldown=Math.max(0,u.boostCooldown-dt);u.disengage=Math.max(0,u.disengage-dt);
+  if(u.dead||u.stun>0){u.move=0;u.vx=0;u.vz=0;u.boost=0;return;}
   const live=u.weapons.filter(w=>!((w.slot==='weaponL'&&u.health.armL<=0)||(w.slot==='weaponR'&&u.health.armR<=0))&&w.ammo>0);
   const hand=live.find(w=>w.slot==='weaponR')||live[0];
   const melee=live.find(w=>w.part.melee);
@@ -56,19 +57,35 @@ function move(b,u,enemy,dt){
   if(u.tactic==='fortress')desired=Math.max(10,...live.map(w=>w.part.range*.67));
   const blocked=lineBlocked(u,enemy);
   let forward=d>desired+1?1:d<desired-1?-1:0;
-  let strafe=Math.sin(b.time*.85+u.id*2.7)>.05?1:-1;
+  let strafe=Math.sin(b.time*1.35+u.id*2.7)>.05?1:-1;
   if(u.tactic==='fortress'&&!blocked){strafe=0;if(d<desired+1)forward=0;}
-  else if(u.tactic==='rush'&&!blocked)strafe*=.14;
-  else strafe*=blocked?1:.5;
+  else if(u.tactic==='rush'&&!blocked)strafe*=d<5?.4:.22;
+  else strafe*=blocked?1:.75;
+  if(u.disengage>0&&d<7){forward=-.65;strafe=u.dashSide;}
   if(blocked&&Math.abs(forward)<.2)forward=.4;
   const len=d||1;
   let mx=dx/len*forward+dz/len*strafe,mz=dz/len*forward-dx/len*strafe;
-  const ml=Math.hypot(mx,mz);if(ml>0){mx/=ml;mz/=ml;}
-  if(u.boost<=0&&u.health.legs>0&&u.energy>27&&u.heat<68&&(u.tactic==='rush'&&d>desired+5||u.tactic==='kite'&&d<desired-3||b.random()<dt*.24)){
-    u.boost=.46;u.energy-=12;u.heat+=4;event(b,'boost',{unit:u.id});
+  let ml=Math.hypot(mx,mz);if(ml>0){mx/=ml;mz/=ml;}
+  // Short committed dashes: translation is locked, aim continues tracking the enemy.
+  const incoming=b.projectiles.some(p=>p.from!==u.id&&!p.visual&&p.life<.5&&Math.hypot(p.x-u.x,p.z-u.z)<9);
+  const readyShot=enemy.weapons.some(w=>w.cd<.18&&!w.part.melee&&d<w.part.range);
+  const advance=u.tactic==='rush'&&d>desired+4;
+  const retreat=u.tactic==='kite'&&d<desired-2||u.disengage>0;
+  const sweep=u.tactic!=='fortress'&&b.time>.6&&d<desired+7;
+  if(u.boost<=0&&u.boostCooldown<=0&&u.health.legs>0&&u.energy>24&&u.heat<78&&(incoming||readyShot||advance||retreat||sweep)){
+    u.dashSide*=-1;
+    let along=advance?.88:retreat?-.6:0,side=advance?u.dashSide*.45:u.dashSide;
+    let ax=dx/len*along+dz/len*side,az=dz/len*along-dx/len*side;
+    if(Math.abs(u.x+ax*5)>15||Math.abs(u.z+az*5)>15){side*=-1;ax=dx/len*along+dz/len*side;az=dz/len*along-dx/len*side;}
+    const norm=Math.hypot(ax,az)||1;u.dashX=ax/norm;u.dashZ=az/norm;
+    u.boost=.4;u.boostCooldown=u.tactic==='fortress'?1.7:1.05;u.energy-=12;u.heat+=3;
+    event(b,'boost',{unit:u.id,dx:u.dashX,dz:u.dashZ});
   }
+  if(u.health.legs<=0)u.boost=0;
   u.boost=Math.max(0,u.boost-dt);
-  const speed=s.speed*(u.health.legs<=0?.28:1)*(u.boost>0?2.3:1)*(u.heat>90?.6:1);
+  if(u.boost>0){mx=u.dashX;mz=u.dashZ;ml=1;}
+  const legKind=getPart(u.build.legs).kind,dashPower=legKind==='tank'?2.5:legKind==='quad'?2.9:3.45;
+  const speed=s.speed*(u.health.legs<=0?.28:1)*(u.boost>0?dashPower:1)*(u.heat>90?.6:1);
   u.vx=mx*speed;u.vz=mz*speed;u.x=clamp(u.x+u.vx*dt,-16,16);u.z=clamp(u.z+u.vz*dt,-16,16);
   for(const c of COVERS){const od=Math.hypot(u.x-c.x,u.z-c.z),radius=c.r+1.13;if(od<radius){u.x=c.x+(u.x-c.x)/(od||1)*radius;u.z=c.z+(u.z-c.z)/(od||1)*radius;}}
   const od=dist(u,enemy);if(od<2.15){u.x=enemy.x+(u.x-enemy.x)/(od||1)*2.15;u.z=enemy.z+(u.z-enemy.z)/(od||1)*2.15;}
@@ -88,7 +105,7 @@ function fire(b,u,enemy,dt){
     accuracy=clamp(accuracy*(1-Math.max(0,d/p.range-.65)*.42),.15,.99);
     const slot=chooseHit(b,u,enemy),hit=b.random()<accuracy;
     event(b,'fire',{unit:u.id,slot:w.slot,kind:p.kind,x:u.x,z:u.z});
-    if(p.melee){if(hit)damage(b,u,enemy,p,slot,1,w.slot);else event(b,'miss',{unit:enemy.id,x:enemy.x,z:enemy.z});}
+    if(p.melee){if(u.tactic==='rush'){u.disengage=.48;u.boost=0;u.boostCooldown=Math.min(u.boostCooldown,.12);}if(hit)damage(b,u,enemy,p,slot,1,w.slot);else event(b,'miss',{unit:enemy.id,x:enemy.x,z:enemy.z});}
     else if(p.kind==='laser'){if(hit)damage(b,u,enemy,p,slot,1,w.slot);b.projectiles.push({id:++b.serial,from:u.id,sourceSlot:w.slot,kind:p.kind,part:p,slot,x:u.x,z:u.z,ax:u.x,az:u.z,tx:enemy.x,tz:enemy.z,life:.12,total:.12,visual:true,hit});}
     else{
       const total=p.kind==='missile'?d/18:d/(p.kind==='railgun'?160:75);

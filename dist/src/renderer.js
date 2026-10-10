@@ -1,11 +1,11 @@
 import * as T from '../vendor/three.module.min.js';
-import {getPart,MAKERS} from './parts.js?v=1.8.0';
-import {COVERS} from './simulation.js?v=1.8.0';
-import {batchRigidMeshes} from './mesh-batch.js?v=1.8.0';
-import {createMech} from './mech-model.js?v=1.8.0';
-import {SoftwareRenderer} from './software-renderer.js?v=1.8.0';
-import {CombatCinematography} from './combat-cinematography.js?v=1.8.0';
-import {CombatEffects} from './combat-effects.js?v=1.8.0';
+import {getPart,MAKERS} from './parts.js?v=1.9.0';
+import {COVERS} from './simulation.js?v=1.9.0';
+import {batchRigidMeshes} from './mesh-batch.js?v=1.9.0';
+import {createMech} from './mech-model.js?v=1.9.0';
+import {SoftwareRenderer} from './software-renderer.js?v=1.9.0';
+import {CombatCinematography} from './combat-cinematography.js?v=1.9.0';
+import {CombatEffects} from './combat-effects.js?v=1.9.0';
 
 const geometries=new Map(),materials=new Map();
 const dark=0x20272a,joint=0x11191d,steel=0x79848a;
@@ -145,8 +145,8 @@ export class MechScene{
         if(slot==='weaponL'||slot==='weaponR')gun.rotation.x=0;
       }
       d.arms.armL.visible=u.health.armL>0;d.arms.armR.visible=u.health.armR>0;
-      d.walkPhase=(d.walkPhase||0)+dt*u.move*2.7;const step=d.walkPhase;d.legs.forEach((leg,i)=>leg.rotation.x=u.health.legs<=0?-.15:Math.sin(step+i*Math.PI)*(u.move>0?.24:.008));
-      d.torso.position.y=d.cy+(u.move>0&&!d.tank?Math.abs(Math.sin(step))*.09:0);d.torso.rotation.x=(u.boost>0?.13:0)+kick*.075;d.torso.rotation.z+=kick*.035*(u.id?1:-1);
+      d.walkPhase=(d.walkPhase||0)+dt*u.move*2.7;const step=d.walkPhase;d.legs.forEach((leg,i)=>leg.rotation.x=u.health.legs<=0?-.15:u.boost>0?-.22+(i%2?1:-1)*.12:Math.sin(step+i*Math.PI)*(u.move>0?.24:.008));
+      d.torso.position.y=d.cy+(u.move>0&&!d.tank?Math.abs(Math.sin(step))*.09:0);d.torso.rotation.x=(u.boost>0?.22:0)+kick*.075;const lateral=u.vx*Math.cos(u.yaw)-u.vz*Math.sin(u.yaw);d.torso.rotation.z+=(this.reducedMotion?0:Math.max(-.12,Math.min(.12,-lateral*.008)))+kick*.035*(u.id?1:-1);
       for(const [slot,arm] of [['weaponL',d.arms.armL],['weaponR',d.arms.armR]]){
         const p=getPart(u.build[slot]),pose=u.firePose[slot]||0;
         const target=this.battle?.units[1-u.id],range=target?Math.hypot(target.x-u.x,target.z-u.z):15,targetHeight=this.unitModels[1-u.id]?.userData.cy||d.cy;
@@ -158,7 +158,7 @@ export class MechScene{
         const target=this.battle?.units[1-u.id],range=target?Math.hypot(target.x-u.x,target.z-u.z):15,height=this.unitModels[1-u.id]?.userData.cy||d.cy;
         d.shoulders[slot].rotation.x=Math.atan2(d.cy+1.18-height,Math.max(2,range))+((u.firePose[slot]||0)>0?-.06:0);
       }
-      d.jets.forEach(j=>{j.visible=u.boost>0;j.scale.y=1+Math.sin(this.time*55)*.22;});
+      d.jets.forEach(j=>{j.visible=u.boost>0;j.scale.y=1.5+Math.sin(this.time*55)*.28;});
     }else{
       d.torso.position.y=d.cy+Math.sin(this.time*1.4)*.009;d.arms.armL.rotation.x=-.035;d.arms.armR.rotation.x=-.035;
       for(const slot of ['weaponL','weaponR'])if(d.guns[slot])d.guns[slot].rotation.x=d.tank?.025:d.quad?.28:d.referenceFrame?1.16:.62;
@@ -166,7 +166,7 @@ export class MechScene{
   }
   render(dt,b=null){if(this.contextLost||dt===0&&!this.dirty)return;const frozen=dt===0;this.time+=dt;
     const software=this.renderer instanceof SoftwareRenderer;
-    this.cinema.update(frozen?0:dt);if(software){const now=performance.now();if(now-this.lastSoftwareFrame<130)return;if(this.mode!=='battle'&&!this.dirty)return;if(this.mode==='battle'&&b?.time===this.lastBattleTime&&!this.fx.active()&&!this.popups.length&&!this.dirty)return;dt=frozen?0:Math.min(.2,(now-this.lastSoftwareFrame)/1000||dt);this.lastSoftwareFrame=now;this.lastBattleTime=b?.time;}
+    this.cinema.update(frozen?0:dt);if(b&&this.mode==='battle')this.cinema.track(b.units,frozen?0:dt);if(software){const now=performance.now();if(now-this.lastSoftwareFrame<130)return;if(this.mode!=='battle'&&!this.dirty)return;if(this.mode==='battle'&&b?.time===this.lastBattleTime&&!this.fx.active()&&!this.popups.length&&!this.dirty)return;dt=frozen?0:Math.min(.2,(now-this.lastSoftwareFrame)/1000||dt);this.lastSoftwareFrame=now;this.lastBattleTime=b?.time;}
     this.unitModels.forEach((m,i)=>this.animateMech(m,this.mode==='battle'?b?.units[i]:null,dt));
     if(this.mode==='battle'&&b){
       const ids=new Set(b.projectiles.map(p=>p.id));for(const [id,m]of this.projectiles)if(!ids.has(id)){this.scene.remove(m);m.geometry.dispose();m.material.dispose();this.projectiles.delete(id);}
@@ -194,9 +194,10 @@ export class MechScene{
     }
     const pos=new T.Vector3(target.x+Math.sin(angle)*r,height,target.z+Math.cos(angle)*r);this.camera.clearViewOffset();
     if(this.mode==='battle'&&b){
-      const previous=this.camera.position.clone(),portrait=this.camera.aspect<.85;
-      const lowerLimit=portrait?1-2*(this.holder.clientHeight-(this.holder.querySelector('#scene-bottom')?.offsetHeight||210)-16)/this.holder.clientHeight:Math.max(-.78,-1+2*(this.holder.clientHeight<420?62:95)/this.holder.clientHeight),upperLimit=portrait?.68:Math.min(.78,1-2*((this.holder.querySelector('#battle-hud')?.offsetHeight||75)+25)/this.holder.clientHeight);
-      if(portrait)this.camera.setViewOffset(this.holder.clientWidth,this.holder.clientHeight,0,(upperLimit+lowerLimit)*this.holder.clientHeight/4,this.holder.clientWidth,this.holder.clientHeight);
+      const previous=this.camera.position.clone(),portrait=this.camera.aspect<.85,footer=this.holder.querySelector('#scene-bottom'),weaponStrip=this.holder.querySelector('#weapon-status');
+      const reserve=Math.max(this.holder.clientHeight<420?100:95,(footer?.offsetHeight||0)+12,weaponStrip?this.holder.getBoundingClientRect().bottom-weaponStrip.getBoundingClientRect().top+12:0);
+      const lowerLimit=portrait?1-2*(this.holder.clientHeight-(this.holder.querySelector('#scene-bottom')?.offsetHeight||210)-16)/this.holder.clientHeight:Math.max(-.78,-1+2*reserve/this.holder.clientHeight),upperLimit=portrait?.68:Math.min(.78,1-2*((this.holder.querySelector('#battle-hud')?.offsetHeight||75)+25)/this.holder.clientHeight);
+      this.camera.setViewOffset(this.holder.clientWidth,this.holder.clientHeight,0,(upperLimit+lowerLimit)*this.holder.clientHeight/4,this.holder.clientWidth,this.holder.clientHeight);
       for(let attempt=0;attempt<12;attempt++){
         this.camera.position.copy(pos);this.camera.lookAt(target);this.camera.updateMatrixWorld(true);let outside=false;
         for(const u of b.units)for(const dx of [-2.0,2.0])for(const dz of [-1.9,1.9])for(const y of [.15,5.9]){const q=new T.Vector3(u.x+dx,y,u.z+dz).project(this.camera);if(Math.abs(q.x)>.86||q.y>upperLimit||q.y<lowerLimit)outside=true;}

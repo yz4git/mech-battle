@@ -1,6 +1,6 @@
 import * as T from '../vendor/three.module.min.js';
-import {finish} from './mech-surface.js?v=1.8.0';
-import {block,cyl,ring,bar,decal,shell} from './mech-geometry.js?v=1.8.0';
+import {finish} from './mech-surface.js?v=1.9.0';
+import {block,cyl,ring,bar,decal,shell} from './mech-geometry.js?v=1.9.0';
 
 // Hand-traced armor boundaries on the user's four-view sheet, in source pixels.
 // Front datum: helmet=155, sole=728, axis=225. Side forward points left, datum=905.

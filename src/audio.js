@@ -47,7 +47,7 @@ export class BattleAudio{
       if(e.type==='hit'&&hits++<3){if(e.kind==='cannon'||e.kind==='missile')this.boom(pan,.55);else{this.hiss(.065,.15,1800,pan);this.tone(e.kind==='laser'?870:310,.06,.12,'triangle',110,pan);}}
       if(e.type==='destroy'){this.boom(pan,1);this.boom(-pan,.6);this.tone(42,.75,.32,'sine',24,pan,.06);}
       if(e.type==='break'){this.boom(pan,.65);this.hiss(.3,.3,1300,pan);}
-      if(e.type==='boost'){this.hiss(.33,.19,500,pan);this.tone(90,.26,.14,'sawtooth',220,pan);}
+      if(e.type==='boost'){this.hiss(.24,.17,1600,pan);this.tone(130,.22,.12,'sawtooth',310,pan);}
       if(e.type==='stagger'){this.tone(430,.16,.2,'triangle',220,pan);this.hiss(.15,.19,1400,pan);}
     }
   }

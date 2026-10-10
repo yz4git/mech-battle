@@ -140,7 +140,7 @@ export class CombatEffects{
       const u=battle.units[i];if(u.dead||u.move<.3||this.time<this.dustAt[i])continue;this.dustAt[i]=this.time+(u.boost>0?.055:.18);
       const pos=new T.Vector3(u.x,.2,u.z);
       this.particle('smoke',pos,{size:u.boost>0?1:.42,life:.7,grow:.7,color:0x88918a,opacity:.45,velocity:new T.Vector3(-u.vx*.12,.15,-u.vz*.12)});
-      if(u.boost>0){pos.y=models[i].userData.cy-.7;pos.x-=Math.sin(u.yaw)*.65;pos.z-=Math.cos(u.yaw)*.65;this.particle('glow',pos,{color:ice,size:.55,life:.22,stretch:2,velocity:new T.Vector3(-u.vx*.4,0,-u.vz*.4)});}
+      if(u.boost>0){pos.y=models[i].userData.cy-.7;const pace=Math.hypot(u.vx,u.vz)||1;pos.x-=u.vx/pace*.9;pos.z-=u.vz/pace*.9;this.particle('glow',pos,{color:ice,size:.65,life:.28,stretch:5,velocity:new T.Vector3(-u.vx*.45,0,-u.vz*.45)});for(const side of [-1,1]){const streak=pos.clone().add(new T.Vector3(u.vz/pace*side*.45,-.6,-u.vx/pace*side*.45));this.particle('glow',streak,{color:0xbbf5ff,size:.13,life:.2,stretch:9,opacity:.55,velocity:new T.Vector3(-u.vx*.6,0,-u.vz*.6)});}}
     }
     if(dt>0){
       for(const burst of this.aftershocks.filter(p=>p.at<=this.time)){const pos=burst.position.clone().add(new T.Vector3((this.random()-.5)*1.8,this.random()*1.6,(this.random()-.5)*1.8));this.flash(pos,burst.scale*1.7);this.spark(pos,8,warm,5);this.smoke(pos,3,.8,0x5d6062);}

@@ -1,4 +1,4 @@
-export const VERSION = '1.8.0';
+export const VERSION = '1.9.0';
 export const MAKERS = [
   {id:'KAS',name:'カサネ重工',color:0x9ca4a7,accent:0xffbd69,shape:0,hp:1.08,weight:1.05,precision:1.0,power:1.0,tech:1.0,desc:'堅実な装甲と扱いやすい制御系'},
   {id:'VLT',name:'ヴォルト工廠',color:0x677b93,accent:0x7fcfff,shape:1,hp:.91,weight:.89,precision:1.08,power:.97,tech:1.1,desc:'軽量・高精度。電力効率を重視'},
@@ -90,7 +90,7 @@ export function statsFor(loadout){
   const weight=+all.reduce((n,x)=>n+x.weight,0).toFixed(1),draw=all.reduce((n,x)=>n+(x.draw||0),0);
   const capacity=p.legs?.capacity||1,output=p.engine?.output||1;
   const weightRatio=weight/capacity,powerRatio=draw/output;
-  const speed=+(p.legs.speed*p.engine.thrust*Math.max(.35,1-Math.max(0,weightRatio-.55)*.42)*Math.min(1,1/powerRatio)).toFixed(2);
+  const speed=+(p.legs.speed*p.engine.thrust*1.6*Math.max(.35,1-Math.max(0,weightRatio-.55)*.42)*Math.min(1,1/powerRatio)).toFixed(2);
   const pools={body:p.body.hp+p.armorBody.hp,armL:p.armL.hp+p.armorArmL.hp,armR:p.armR.hp+p.armorArmR.hp,legs:p.legs.hp+p.armorLegs.hp};
   const resist=Object.fromEntries(Object.keys(pools).map(key=>{
     const a=p['armor'+key[0].toUpperCase()+key.slice(1)];return [key,{kinetic:a?.kinetic||0,thermal:a?.thermal||0,explosive:a?.explosive||0}];
@@ -104,8 +104,8 @@ export function statsFor(loadout){
     armor:Math.round(Object.values(resist).reduce((n,r)=>n+r.kinetic+r.thermal+r.explosive,0)/12)};
 }
 export const TACTICS = [
-  {id:'balanced',name:'適正距離',desc:'主武器の射程に合わせて攻防を切り替える'},
-  {id:'rush',name:'接近強襲',desc:'近接武器を優先して一気に距離を詰める'},
+  {id:'balanced',name:'適正距離',desc:'射程を保ちながら横ダッシュで射撃と回避を切り替える'},
+  {id:'rush',name:'接近強襲',desc:'ダッシュで接近し、近接攻撃後に切り返して離脱'},
   {id:'kite',name:'引き撃ち',desc:'距離を保って遠距離武器で削る'},
   {id:'fortress',name:'固定砲台',desc:'移動を抑えて照準精度と砲撃を重視'}
 ];
