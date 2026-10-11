@@ -1,9 +1,9 @@
-import {EditorGestures} from './editor-gestures.js?v=2.4.1';
-import {prepareProjectionTexture} from './projection-texture.js?v=2.4.1';
-import {readProject,writeProject} from './editor-storage.js?v=2.4.1';
+import {EditorGestures} from './editor-gestures.js?v=2.4.2';
+import {prepareProjectionTexture} from './projection-texture.js?v=2.4.2';
+import {readProject,writeProject} from './editor-storage.js?v=2.4.2';
 import * as T from '../vendor/three.module.min.js';
 import {GLTFExporter} from '../vendor/GLTFExporter.js';
-import {freshProject,normalizeProject,makeEditorModel,applyTransforms,cleanExport,modelStats,disposeModel,EDITOR_KEY} from './editor-model.js?v=2.4.1';
+import {freshProject,normalizeProject,makeEditorModel,applyTransforms,cleanExport,modelStats,disposeModel,EDITOR_KEY} from './editor-model.js?v=2.4.2';
 const $=id=>document.getElementById(id),stage=$('stage'),status=$('status');let timer;
 function toast(s){status.textContent=s;status.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>status.classList.remove('show'),3500);}
 let project=freshProject();try{const saved=await readProject();if(saved)project=normalizeProject(saved);else{const raw=localStorage.getItem(EDITOR_KEY);if(raw)project=normalizeProject(JSON.parse(raw));}}catch{try{const raw=localStorage.getItem(EDITOR_KEY);if(raw)project=normalizeProject(JSON.parse(raw));}catch{}}
@@ -81,7 +81,7 @@ $('autoGenerate').onclick=async()=>{
    const sw=Math.max(1,a[2]*refImage.width),sh=Math.max(1,a[3]*refImage.height);c.drawImage(refImage,a[0]*refImage.width,a[1]*refImage.height,sw,sh,0,0,canvas.width,canvas.height);
    const data=c.getImageData(0,0,canvas.width,canvas.height);images[key]={width:canvas.width,height:canvas.height,data:data.data,aspect:sw/sh};
   }
-  const result=await new Promise((resolve,reject)=>{const worker=new Worker(new URL('./reconstruct-worker.js?v=2.4.1',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(Error('処理時間が長すぎます。標準精度でもう一度生成してください'));},90000);const finish=()=>{clearTimeout(timeout);worker.terminate();};worker.onmessage=e=>{finish();e.data.ok?resolve(e.data.result):reject(Error(e.data.error));};worker.onerror=()=>{finish();reject(Error('画像解析を起動できません。ページを再読み込みしてください'));};worker.postMessage({images,options:{threshold:Number($('autoThreshold').value),resolution:Number($('autoResolution').value),relief:Number($('autoRelief').value),rounding:Number($('autoRounding').value)}});});
+  const result=await new Promise((resolve,reject)=>{const worker=new Worker(new URL('./reconstruct-worker.js?v=2.4.2',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(Error('処理時間が長すぎます。標準精度でもう一度生成してください'));},90000);const finish=()=>{clearTimeout(timeout);worker.terminate();};worker.onmessage=e=>{finish();e.data.ok?resolve(e.data.result):reject(Error(e.data.error));};worker.onerror=()=>{finish();reject(Error('画像解析を起動できません。ページを再読み込みしてください'));};worker.postMessage({images,options:{threshold:Number($('autoThreshold').value),resolution:Number($('autoResolution').value),relief:Number($('autoRelief').value),rounding:Number($('autoRounding').value)}});});
   result.atlas=atlas;await prepareProjectionTexture({reconstruction:result});snapshot();project.reconstruction=result;project.transforms={};project.plates=[];selected='torso';rebuild();setView('orbit');
   $('autoReport').textContent=`生成完了：${result.filled.toLocaleString()}個の体積セルから、${(result.triangleCount||result.faces?.length*2).toLocaleString()}三角形を生成。${result.views>1?'四面図の高さを合わせて連続した立体表面を生成':'一枚絵から奥行きを仮定'}。${result.fit?'輪郭一致度：'+Object.entries(result.fit).map(([key,value])=>({front:'正面',back:'背面',left:'左',right:'右'}[key])+value+'%').join(' / ')+'（抽出輪郭との投影比較）。':''}部品タブで補正し、出力タブからGLBを書き出せます。`;
   toast('画像から3Dモデルと装甲テクスチャを生成しました');

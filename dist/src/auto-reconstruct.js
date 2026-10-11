@@ -1,6 +1,6 @@
-import {rowIntervals,sectionDistance} from './cross-section.js?v=2.4.1';
-import {refineRegistration} from './view-registration.js?v=2.4.1';
-import {distanceField,sampleField,registerView,extractSurface} from './surface-reconstruction.js?v=2.4.1';
+import {rowIntervals,sectionDistance} from './cross-section.js?v=2.4.2';
+import {refineRegistration} from './view-registration.js?v=2.4.2';
+import {distanceField,sampleField,registerView,extractSurface} from './surface-reconstruction.js?v=2.4.2';
 // Visual hull reconstruction. No remote inference; color is projected from source views.
 export function segmentImage(image,threshold=35){
  const {width:w,height:h,data}=image,n=w*h,mask=new Uint8Array(n);let border=[[],[],[]];

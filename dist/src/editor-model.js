@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import {makeReconstructedModel,validateReconstruction} from './reconstructed-model.js?v=2.4.1';
+import {makeReconstructedModel,validateReconstruction} from './reconstructed-model.js?v=2.4.2';
 import {createReferenceFrame} from './reference-frame.js?v=2.0.0';
 import {batchRigidMeshes} from './mesh-batch.js?v=1.9.0';
 import {starterLoadout,getPart} from './parts.js?v=1.9.0';
@@ -19,6 +19,9 @@ export function makeEditorModel(project){
  const generated=project.reconstruction?makeReconstructedModel(project.reconstruction,project.height):null;
  const root=generated?.root||createReferenceFrame(build,parts,0,false,[{color:new T.Color(project.paint).getHex()}],false,true,true,false,true);
  const nodes=generated?.nodes||root.userData.editorNodes;
+ // Reference markings use baked matrices. Decompose them before changing pivots;
+ // otherwise changing child.position has no effect and the parent moves them twice.
+ prepareEditableTransforms(root);
  // Place elbow and knee pivots where the mechanical hinges are, without moving the rest mesh.
  if(!generated)for(const side of ['L','R']){
   const arm=nodes[`arm${side}`],fore=nodes[`forearm${side}`],leg=nodes[`leg${side}`],shin=nodes[`shin${side}`],boot=nodes[`boot${side}`];
@@ -45,6 +48,7 @@ export function makeEditorModel(project){
  const wrapper=new T.Group();wrapper.name='MECH';wrapper.scale.setScalar(unit);root.position.y-=floor;root.name='rig';wrapper.add(root);
  return {root:wrapper,rig:root,nodes,bases};
 }
+export function prepareEditableTransforms(root){root.traverse(o=>{if(!o.matrixAutoUpdate){o.matrix.decompose(o.position,o.quaternion,o.scale);o.matrixAutoUpdate=true;}});root.updateMatrixWorld(true);}
 function pivot(node,point){const offset=point.clone();node.position.add(offset.clone().applyQuaternion(node.quaternion).multiply(node.scale));for(const child of node.children)child.position.sub(offset);node.updateMatrixWorld(true);}
 export function applyTransforms(nodes,bases,p){for(const [name,node]of Object.entries(nodes)){const base=bases[name],v=p.transforms[name];node.position.copy(base.position);node.rotation.copy(base.rotation);node.scale.copy(base.scale);node.visible=v?.visible!==false;if(v){node.position.add(new T.Vector3(...v.position));node.rotation.x+=T.MathUtils.degToRad(v.rotation[0]);node.rotation.y+=T.MathUtils.degToRad(v.rotation[1]);node.rotation.z+=T.MathUtils.degToRad(v.rotation[2]);node.scale.multiply(new T.Vector3(...v.scale));}}}
 export function cleanExport(model){
