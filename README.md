@@ -166,3 +166,5 @@ Open `editor.html` (or the MECH FORGE link in the game). The supplied A-11 four-
 MECH FORGE v2.1 adds browser-local automatic visual-hull generation from reference images, projected colors, heuristic rigid part splitting, and reusable GLB/JSON output. No inference server or pretrained weights are required. Generated block surfaces are approximations and require refinement for final game assets.
 
 MECH FORGE v2.2 replaces block faces with interpolated continuous surfaces, aligns all four reference views by floor/body height and center axis, projects full RGB by surface orientation, reports per-view silhouette IoU, and uses IndexedDB for larger editable projects. Regenerate existing references to use the improved method.
+
+MECH FORGE v2.3 adds bounded silhouette registration refinement, a persistent four-view projection texture atlas with exportable UV coordinates, and adjustable shallow image-guided armor relief. Re-generate to use the improvements; earlier project formats remain readable.
