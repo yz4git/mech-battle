@@ -168,3 +168,5 @@ MECH FORGE v2.1 adds browser-local automatic visual-hull generation from referen
 MECH FORGE v2.2 replaces block faces with interpolated continuous surfaces, aligns all four reference views by floor/body height and center axis, projects full RGB by surface orientation, reports per-view silhouette IoU, and uses IndexedDB for larger editable projects. Regenerate existing references to use the improved method.
 
 MECH FORGE v2.3 adds bounded silhouette registration refinement, a persistent four-view projection texture atlas with exportable UV coordinates, and adjustable shallow image-guided armor relief. Re-generate to use the improvements; earlier project formats remain readable.
+
+Editor v2.4 adds adjustable rounded cross sections to reduce slab-like limbs, and foreground-aware texture projection to avoid painting sheet backgrounds onto missing/occluded equipment. These are explicit shape and visibility heuristics; regenerate from the Image tab to apply them to an existing model.

@@ -1,5 +1,6 @@
-import {refineRegistration} from './view-registration.js?v=2.3.0';
-import {distanceField,sampleField,registerView,extractSurface} from './surface-reconstruction.js?v=2.3.0';
+import {rowIntervals,sectionDistance} from './cross-section.js?v=2.4.0';
+import {refineRegistration} from './view-registration.js?v=2.4.0';
+import {distanceField,sampleField,registerView,extractSurface} from './surface-reconstruction.js?v=2.4.0';
 // Visual hull reconstruction. No remote inference; color is projected from source views.
 export function segmentImage(image,threshold=35){
  const {width:w,height:h,data}=image,n=w*h,mask=new Uint8Array(n);let border=[[],[],[]];
@@ -22,7 +23,7 @@ export function segmentImage(image,threshold=35){
  return {mask:closed,width:w,height:h,data,bounds:[minX,minY,maxX,maxY],aspect:image.aspect||1,area};
 }
 function pixel(v,x,y){const [a,b,c,d]=v.bounds;const px=Math.max(0,Math.min(v.width-1,Math.round(a+x*(c-a)))),py=Math.max(0,Math.min(v.height-1,Math.round(b+y*(d-b))));return py*v.width+px;}
-export function reconstruct(images,{threshold=35,resolution=96,relief=.5}={}){
+export function reconstruct(images,{threshold=35,resolution=96,relief=.5,rounding=.65}={}){
  const views={};for(const key of ['front','left','right','back'])if(images[key])views[key]=distanceField(segmentImage(images[key],threshold));
  const front=views.front,side=views.left||views.right,back=views.back;
  const ny=resolution,nx=Math.round(resolution*.8),nz=Math.round(resolution*.6),fb=front.bounds;
@@ -47,6 +48,10 @@ export function reconstruct(images,{threshold=35,resolution=96,relief=.5}={}){
  const originalAlignedY=alignedY;
  const sideY=(key,y)=>key==='right'&&sideMappings.right?1-(1-originalAlignedY('left',y))*sideMappings.right.scaleY+sideMappings.right.shiftY:originalAlignedY(key,y);
 
+ const roundingStrength=Math.max(0,Math.min(1,Number(rounding)||0));
+ const sideDistance=(z,py)=>{const values=[];for(const key of ['left','right'])if(views[key])values.push(sampleField(views[key],sideX(key,z),sideY(key,py))/(views[key].bounds[3]-views[key].bounds[1]));return values.reduce((a,b)=>a+b,0)/values.length+.006;};
+ const sections=side&&roundingStrength?Array.from({length:ny+1},(_,i)=>({front:rowIntervals(x=>sampleField(front,x,1-i/ny)),side:rowIntervals(z=>sideDistance(z,1-i/ny))})):null;
+ const sectionPower=16-12*roundingStrength;
  const scale=v=>1/(v.bounds[3]-v.bounds[1]);
  const part=(x,y)=>{const side=x<frontAxis?'L':'R',cx=Math.abs(x-frontAxis);if(y>.84&&cx<.17)return 1;if(y>.77&&cx>.22)return side==='L'?14:15;if(y>.48){if(cx>.23)return y>.62?(side==='L'?3:4):(side==='L'?5:6);return 2;}if(cx>.37&&y>.15)return side==='L'?16:17;if(y>.41&&cx<.25)return 7;if(y>.23)return side==='L'?8:9;if(y>.09)return side==='L'?10:11;return side==='L'?12:13;};
  const field=(x,y,z)=>{
@@ -54,21 +59,24 @@ export function reconstruct(images,{threshold=35,resolution=96,relief=.5}={}){
   const py=1-y,f=sampleField(front,x,py)*scale(front);let shape=f;
   // Small disagreement tolerance avoids deleting limbs when the design sheet differs across views.
   if(back)shape=Math.min(shape,sampleField(back,backX(x),alignedY('back',py))*scale(back)+.045);
-  if(side){const distances=[];if(views.left)distances.push(sampleField(views.left,sideX('left',z),sideY('left',py))*scale(views.left));if(views.right)distances.push(sampleField(views.right,sideX('right',z),sideY('right',py))*scale(views.right));
-   const average=distances.reduce((a,b)=>a+b,0)/distances.length;
-   // Averaged left/right signed fields use both side silhouettes without a harsh double intersection.
-   shape=Math.min(shape,average+.006);
+  if(side){shape=Math.min(shape,sideDistance(z,py));
+   if(sections){const row=sections[Math.max(0,Math.min(ny,Math.round(y*ny)))];shape=Math.min(shape,sectionDistance(x,z,row.front,row.side,width,depth,sectionPower));}
   }else shape=Math.min(shape,(.43*Math.sqrt(Math.max(0,1-((x-.5)*1.7)**2))-Math.abs(z-.5))*depth);
   return shape;
  };
- const projectPoint=(p,normal)=>{
-  const x=p[0]/width+frontAxis,py=1-p[1],z=p[2]/depth+.5;let key=normal[2]<0&&back?'back':'front';
-  if(Math.abs(normal[0])>Math.abs(normal[2])*1.15){if(normal[0]<0&&views.left)key='left';if(normal[0]>0&&views.right)key='right';}
-  const v=views[key],u=key==='back'?backX(x):key==='left'?sideX('left',z):key==='right'?sideX('right',z):x,y=key==='front'?py:(key==='left'||key==='right'?sideY(key,py):alignedY(key,py));
-  return {key,v,u:Math.max(0,Math.min(1,u)),y:Math.max(0,Math.min(1,y))};
+ const coordinates=(key,p)=>{const x=p[0]/width+frontAxis,py=1-p[1],z=p[2]/depth+.5;return {key,v:views[key],u:key==='back'?backX(x):key==='left'||key==='right'?sideX(key,z):x,y:key==='front'?py:key==='left'||key==='right'?sideY(key,py):alignedY('back',py)};};
+ const projectPoint=(p,normal,center=p)=>{
+  let preferred=normal[2]<0&&back?'back':'front';
+  if(Math.abs(normal[0])>Math.abs(normal[2])*1.15){if(normal[0]<0&&views.left)preferred='left';if(normal[0]>0&&views.right)preferred='right';}
+  const q=coordinates(preferred,center);let key=preferred;
+  // A missing rifle or a view-specific occlusion must not project the sheet's background.
+  if(sampleField(q.v,q.u,q.y)<.5){let best=-Infinity;const length=Math.hypot(...normal)||1;
+   for(const candidate of Object.keys(views)){const a=coordinates(candidate,center),margin=sampleField(a.v,a.u,a.y);if(margin<.5)continue;const alignment={front:normal[2],back:-normal[2],left:-normal[0],right:normal[0]}[candidate]/length,value=alignment+Math.min(6,margin)*.02;if(value>best){best=value;key=candidate;}}
+  }
+  const a=coordinates(key,p);return {...a,u:Math.max(0,Math.min(1,a.u)),y:Math.max(0,Math.min(1,a.y))};
  };
  const color=(p,id,normal)=>{const {v,u,y}=projectPoint(p,normal),at=pixel(v,u,y)*4;return (v.data[at]<<16)|(v.data[at+1]<<8)|v.data[at+2];};
- const uv=(p,normal)=>{const {key,v,u,y}=projectPoint(p,normal),[a,b,c,d]=v.bounds,[tx,ty]={front:[0,0],back:[1,0],left:[0,1],right:[1,1]}[key];return [(tx+Math.max(.001,Math.min(.999,(a+u*(c-a)+.5)/v.width)))/2,1-(ty+Math.max(.001,Math.min(.999,(b+y*(d-b)+.5)/v.height)))/2];};
+ const uv=(p,normal,center)=>{const {key,v,u,y}=projectPoint(p,normal,center),[a,b,c,d]=v.bounds,[tx,ty]={front:[0,0],back:[1,0],left:[0,1],right:[1,1]}[key];return [(tx+Math.max(.001,Math.min(.999,(a+u*(c-a)+.5)/v.width)))/2,1-(ty+Math.max(.001,Math.min(.999,(b+y*(d-b)+.5)/v.height)))/2];};
  const surface=extractSurface({nx,ny,nz,width,depth,originX:frontAxis,field,part,color,uv});
  // A conservative image-guided inset gives broad dark frame regions depth beneath light armor.
  // It is a depth prior, not a metric depth estimate; silhouette edges and thin equipment stay fixed.
@@ -88,5 +96,5 @@ export function reconstruct(images,{threshold=35,resolution=96,relief=.5}={}){
  if(back)fit.back=overlap(surface.frontProjection,nx,(x,y)=>sampleField(back,backX(x),alignedY('back',y))>0);
  for(const key of ['left','right'])if(views[key])fit[key]=overlap(surface.sideProjection,nz,(x,y)=>sampleField(views[key],sideX(key,x),sideY(key,y))>0);
 
- return {version:2,grid:[nx,ny,nz],width,depth,positions:surface.positions.map(v=>Math.round(v*100000)/100000),triangles:surface.triangles,uvs:surface.uvs,filled:surface.filled,views:Object.keys(views).length,threshold,relief:reliefStrength,registration,sideMappings,frontAxis,backAxis,fit,triangleCount:triangles};
+ return {version:2,grid:[nx,ny,nz],width,depth,positions:surface.positions.map(v=>Math.round(v*100000)/100000),triangles:surface.triangles,uvs:surface.uvs,filled:surface.filled,views:Object.keys(views).length,threshold,relief:reliefStrength,rounding:roundingStrength,registration,sideMappings,frontAxis,backAxis,fit,triangleCount:triangles};
 }

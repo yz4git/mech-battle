@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import {makeReconstructedModel,validateReconstruction} from './reconstructed-model.js?v=2.3.0';
+import {makeReconstructedModel,validateReconstruction} from './reconstructed-model.js?v=2.4.0';
 import {createReferenceFrame} from './reference-frame.js?v=2.0.0';
 import {batchRigidMeshes} from './mesh-batch.js?v=1.9.0';
 import {starterLoadout,getPart} from './parts.js?v=1.9.0';

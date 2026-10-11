@@ -1,4 +1,4 @@
-import {projectionTexture} from './projection-texture.js?v=2.3.0';
+import {projectionTexture} from './projection-texture.js?v=2.4.0';
 import * as T from '../vendor/three.module.min.js';
 const names=['','helmet','torso','armL','armR','forearmL','forearmR','hips','legL','legR','shinL','shinR','bootL','bootR','shoulderL','shoulderR','weaponL','weaponR'];
 export function makeReconstructedModel(r,height=4.8){
