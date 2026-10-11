@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {EditorGestures} from '../src/editor-gestures.js';
+test('pinch scales the model without accidental selection or residual orbit movement',()=>{const g=new EditorGestures();g.down(1,0,0);g.down(2,100,0);assert.equal(g.move(2,200,0).zoom,.5);assert.equal(g.up(2),false);assert.equal(g.move(1,10,0).dx,0);assert.equal(g.up(1),false);g.down(3,20,20);assert.equal(g.up(3),true);});
+test('drag and cancelled pointers do not become taps',()=>{const g=new EditorGestures();g.down(1,0,0);assert.equal(g.move(1,20,0).dx,20);assert.equal(g.up(1),false);g.down(2,0,0);g.cancel(2);assert.equal(g.up(2),false);assert.equal(g.move(2,10,10),null);});

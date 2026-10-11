@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {armorMounts} from '../src/armor-mounts.js';import {freshProject,makeEditorModel} from '../src/editor-model.js';
+function fixture(){const r={version:2,grid:[64,64,64],width:.5,depth:.4,positions:[],triangles:[]};
+ const cube=(lo,hi)=>{const offset=r.positions.length/3;for(const q of [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]])r.positions.push(...q.map((v,k)=>v?hi[k]:lo[k]));for(const f of [[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]])for(const t of [[0,1,2],[0,2,3]])r.triangles.push(...t.map(i=>f[i]+offset),2,0xaaaaaa);};
+ cube([-.1,.3,-.1],[.1,.7,.1]);cube([-.06,.65,.12],[.06,.7,.13]);cube([.35,.8,.3],[.36,.81,.31]);return r;
+}
+test('nearby detached armor gets short body mounts and isolated tiny debris is omitted',()=>{const r=fixture(),plan=armorMounts(r);assert.ok(plan.mounts.length>=1);assert.equal(plan.discard.size,12);assert.ok(plan.mounts.every(m=>m.distance<=.055));const p=freshProject();p.reconstruction=r;const model=makeEditorModel(p);let mounts=0;model.root.traverse(o=>{if(o.name==='armor_mount'){mounts++;assert.equal(o.parent,model.nodes.torso);assert.ok(o.geometry.attributes.position.array.every(Number.isFinite));}});assert.equal(mounts,plan.mounts.length);});

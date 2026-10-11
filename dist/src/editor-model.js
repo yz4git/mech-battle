@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import {makeReconstructedModel,validateReconstruction} from './reconstructed-model.js?v=2.4.0';
+import {makeReconstructedModel,validateReconstruction} from './reconstructed-model.js?v=2.4.1';
 import {createReferenceFrame} from './reference-frame.js?v=2.0.0';
 import {batchRigidMeshes} from './mesh-batch.js?v=1.9.0';
 import {starterLoadout,getPart} from './parts.js?v=1.9.0';
@@ -33,6 +33,8 @@ export function makeEditorModel(project){
    root.updateMatrixWorld(true);const box=new T.Box3().setFromObject(node);if(!box.isEmpty())pivot(node,node.worldToLocal(box.getCenter(new T.Vector3())));
   }
  }
+ // Calibrate from the unedited body so moving/hiding parts cannot resize unrelated parts.
+ const bounds=new T.Box3().setFromObject(root),unit=project.height/Math.max(.001,bounds.max.y-bounds.min.y),floor=bounds.min.y;
  for(const plate of project.plates){const parent=nodes[plate.parent]||root,shape=new T.Shape(plate.points.map(([x,y])=>new T.Vector2(x,y)));
   const geometry=new T.ExtrudeGeometry(shape,{depth:plate.depth,bevelEnabled:plate.bevel>0,bevelSize:Math.min(plate.bevel,plate.depth*.2),bevelThickness:Math.min(plate.bevel,plate.depth*.2),bevelSegments:1,steps:1,curveSegments:1});
   geometry.translate(0,0,-plate.depth/2);const mesh=new T.Mesh(geometry,new T.MeshStandardMaterial({color:plate.color,metalness:.45,roughness:.55}));const g=new T.Group();g.name=plate.id;g.add(mesh);parent.add(g);nodes[plate.id]=g;
@@ -40,7 +42,7 @@ export function makeEditorModel(project){
  batchRigidMeshes(root);
  const bases={};for(const [name,node]of Object.entries(nodes)){bases[name]={position:node.position.clone(),rotation:node.rotation.clone(),scale:node.scale.clone()};}
  applyTransforms(nodes,bases,project);
- const bounds=new T.Box3().setFromObject(root),unit=project.height/(bounds.max.y-bounds.min.y);const wrapper=new T.Group();wrapper.name='MECH';wrapper.scale.setScalar(unit);root.position.y=-bounds.min.y;root.name='rig';wrapper.add(root);
+ const wrapper=new T.Group();wrapper.name='MECH';wrapper.scale.setScalar(unit);root.position.y-=floor;root.name='rig';wrapper.add(root);
  return {root:wrapper,rig:root,nodes,bases};
 }
 function pivot(node,point){const offset=point.clone();node.position.add(offset.clone().applyQuaternion(node.quaternion).multiply(node.scale));for(const child of node.children)child.position.sub(offset);node.updateMatrixWorld(true);}

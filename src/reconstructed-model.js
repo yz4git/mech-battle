@@ -1,4 +1,5 @@
-import {projectionTexture} from './projection-texture.js?v=2.4.0';
+import {armorMounts} from './armor-mounts.js?v=2.4.1';
+import {projectionTexture} from './projection-texture.js?v=2.4.1';
 import * as T from '../vendor/three.module.min.js';
 const names=['','helmet','torso','armL','armR','forearmL','forearmR','hips','legL','legR','shinL','shinR','bootL','bootR','shoulderL','shoulderR','weaponL','weaponR'];
 export function makeReconstructedModel(r,height=4.8){
@@ -8,14 +9,20 @@ export function makeReconstructedModel(r,height=4.8){
  for(const name of names.slice(1)){const g=new T.Group();g.name=name;g.position.fromArray(pivots[name]);root.add(g);nodes[name]=g;}
  root.updateMatrixWorld(true);
  for(const side of ['L','R']){nodes.torso.attach(nodes[`arm${side}`]);nodes[`arm${side}`].attach(nodes[`forearm${side}`]);nodes.hips.attach(nodes[`leg${side}`]);nodes[`leg${side}`].attach(nodes[`shin${side}`]);nodes[`shin${side}`].attach(nodes[`boot${side}`]);}nodes.torso.attach(nodes.helmet);for(const side of ['L','R']){nodes.torso.attach(nodes[`shoulder${side}`]);nodes[`forearm${side}`].attach(nodes[`weapon${side}`]);}root.updateMatrixWorld(true);
+ const mounts=armorMounts(r);
  const map=projectionTexture(r.atlas);
  const buckets=new Map();const corners=[[[1,0,0],[1,1,0],[1,1,1],[1,0,1]],[[0,0,1],[0,1,1],[0,1,0],[0,0,0]],[[0,1,1],[1,1,1],[1,1,0],[0,1,0]],[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],[[0,0,1],[1,0,1],[1,1,1],[0,1,1]],[[1,0,0],[0,0,0],[0,1,0],[1,1,0]]];
  if(r.version===2){
-  for(let t=0;t<r.triangles.length;t+=5){const id=r.triangles[t+3],name=names[id],bucket=buckets.get(name)||{p:[],c:[],keys:[],uv:[]};const color=new T.Color(r.triangles[t+4]),pivot=pivots[name];
+  for(let t=0;t<r.triangles.length;t+=5){if(mounts.discard.has(t))continue;const id=r.triangles[t+3],name=names[id],bucket=buckets.get(name)||{p:[],c:[],keys:[],uv:[]};const color=new T.Color(r.triangles[t+4]),pivot=pivots[name];
    for(let i=0;i<3;i++){const index=r.triangles[t+i];for(let k=0;k<3;k++)bucket.p.push(r.positions[index*3+k]*height-pivot[k]);bucket.c.push(color.r,color.g,color.b);bucket.keys.push(index);if(r.uvs){const offset=t/5*6+i*2;bucket.uv.push(r.uvs[offset]/65535,r.uvs[offset+1]/65535);}}buckets.set(name,bucket);
   }
  }else for(const [x,y,z,d,id,rgb]of r.faces){const name=names[id],bucket=buckets.get(name)||{p:[],c:[]};const color=new T.Color(rgb);for(const i of [0,1,2,0,2,3]){const q=corners[d][i],p=[((x+q[0])/nx-.5)*r.width,(y+q[1])/ny,((z+q[2])/nz-.5)*r.depth],pivot=pivots[name];bucket.p.push(...p.map((v,i)=>v*height-pivot[i]));bucket.c.push(color.r,color.g,color.b);}buckets.set(name,bucket);}
  for(const [name,b]of buckets){const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(b.p,3));g.setAttribute('color',new T.Float32BufferAttribute(b.c,3));if(b.uv?.length)g.setAttribute('uv',new T.Float32BufferAttribute(b.uv,2));g.computeVertexNormals();if(b.keys)creaseNormals(g,b.keys);g.userData.owned=true;const m=new T.Mesh(g,new T.MeshStandardMaterial({map:map||null,vertexColors:!map,metalness:map?.18:.35,roughness:map?.72:.65}));nodes[name].add(m);}
+ for(const mount of mounts.mounts){const node=nodes[names[mount.part]];if(!node)continue;
+  const a=new T.Vector3(...mount.a).multiplyScalar(height),b=new T.Vector3(...mount.b).multiplyScalar(height),direction=b.clone().sub(a).normalize();a.addScaledVector(direction,-.003*height);b.addScaledVector(direction,.003*height);
+  const geometry=new T.BoxGeometry(.009*height,a.distanceTo(b),.009*height);geometry.userData.owned=true;
+  const bracket=new T.Mesh(geometry,new T.MeshStandardMaterial({color:0x353e43,metalness:.7,roughness:.55}));bracket.name='armor_mount';bracket.position.copy(a).add(b).multiplyScalar(.5).sub(new T.Vector3(...pivots[names[mount.part]]));bracket.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction);node.add(bracket);
+ }
  return {root,nodes};
 }
 function creaseNormals(g,keys){
