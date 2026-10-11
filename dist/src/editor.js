@@ -1,9 +1,10 @@
+import {readProject,writeProject} from './editor-storage.js?v=2.2.0';
 import * as T from '../vendor/three.module.min.js';
 import {GLTFExporter} from '../vendor/GLTFExporter.js';
-import {freshProject,normalizeProject,makeEditorModel,applyTransforms,cleanExport,modelStats,disposeModel,EDITOR_KEY} from './editor-model.js?v=2.1.0';
+import {freshProject,normalizeProject,makeEditorModel,applyTransforms,cleanExport,modelStats,disposeModel,EDITOR_KEY} from './editor-model.js?v=2.2.0';
 const $=id=>document.getElementById(id),stage=$('stage'),status=$('status');let timer;
 function toast(s){status.textContent=s;status.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>status.classList.remove('show'),3500);}
-let project=freshProject();try{const raw=localStorage.getItem(EDITOR_KEY);if(raw)project=normalizeProject(JSON.parse(raw));}catch{}
+let project=freshProject();try{const saved=await readProject();if(saved)project=normalizeProject(saved);else{const raw=localStorage.getItem(EDITOR_KEY);if(raw)project=normalizeProject(JSON.parse(raw));}}catch{try{const raw=localStorage.getItem(EDITOR_KEY);if(raw)project=normalizeProject(JSON.parse(raw));}catch{}}
 let model,selected='torso',helper,view='orbit',yaw=.55,pitch=.14,zoom=1,trace=false,points=[],refImage=null,refURL=null;
 const history=[],future=[],refs=Object.fromEntries(['front','back','left','right'].map(k=>[k,{crop:[0,0,1,1],scale:1,x:0,y:0}]));
 const labels={torso:'胸部全体',hips:'腰部全体',sternum:'胸部中央装甲',helmet:'頭部',back:'背部ユニット',pelvis:'骨盤',armL:'左腕 / 肩関節',armR:'右腕 / 肩関節',forearmL:'左前腕 / 肘関節',forearmR:'右前腕 / 肘関節',legL:'左脚 / 股関節',legR:'右脚 / 股関節',shinL:'左すね / 膝関節',shinR:'右すね / 膝関節',bootL:'左足',bootR:'右足',shoulderL:'左肩ユニット',shoulderR:'右肩ユニット',weaponL:'左武器',weaponR:'右武器'};
@@ -11,8 +12,11 @@ const scene=new T.Scene(),camera=new T.OrthographicCamera(-4,4,4,-4,.1,100);let 
 try{renderer=new T.WebGLRenderer({canvas:$('render'),alpha:true,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;}catch{toast('WebGLを起動できません。Safariで再読み込みしてください。');throw Error('WebGL unavailable');}
 scene.add(new T.HemisphereLight(0xc4e5ff,0x43505b,2));for(const [x,y,z,color,intensity]of [[5,9,7,0xffecd4,3.5],[-5,4,-5,0x7faed9,3]]){const l=new T.DirectionalLight(color,intensity);l.position.set(x,y,z);scene.add(l);}
 const grid=new T.GridHelper(14,28,0x456574,0x283e4a);scene.add(grid);
-function snapshot(){history.push(JSON.stringify(project));if(history.length>40)history.shift();future.length=0;}
-function save(silent=false){try{localStorage.setItem(EDITOR_KEY,JSON.stringify(project));if(!silent)toast('機体を保存しました');}catch{toast('保存領域が不足しています。JSONで書き出してください');}}
+function projectSnapshot(){return {...project,transforms:structuredClone(project.transforms),plates:structuredClone(project.plates)};}
+function snapshot(){history.push(projectSnapshot());if(history.length>20)history.shift();future.length=0;}
+let saveChain=Promise.resolve();
+function save(silent=false){const current=projectSnapshot();saveChain=saveChain.catch(()=>{}).then(async()=>{try{await writeProject(current);if(!current.reconstruction)localStorage.setItem(EDITOR_KEY,JSON.stringify(current));if(!silent)toast('機体を保存しました');}catch{try{localStorage.setItem(EDITOR_KEY,JSON.stringify(current));if(!silent)toast('機体を保存しました');}catch{toast('保存領域が不足しています。JSONで書き出してください');}}});return saveChain;}
+
 function rebuild(){if(model){scene.remove(model.root);disposeModel(model.root);}model=makeEditorModel(project);scene.add(model.root);if(!model.nodes[selected])selected='torso';const select=$('part');select.replaceChildren();for(const key of Object.keys(model.nodes)){const option=document.createElement('option');option.value=key;option.textContent=labels[key]||key;select.append(option);}select.value=selected;const stats=modelStats(model.root);$('stats').textContent=`${Math.round(stats.triangles).toLocaleString()} TRI · ${stats.meshes} MESH`;$('model-name').textContent=project.name;refresh();resize();appearance();save(true);}
 function transform(){return project.transforms[selected]||{position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true};}
 function refresh(){const v=transform();$('name').value=project.name;$('height').value=project.height;$('paint').value=project.paint;$('visible').checked=v.visible;for(const kind of ['position','rotation','scale'])for(let i=0;i<3;i++)$(`${kind}${i}`).value=v[kind][i];$('pose').value=0;applyTransforms(model.nodes,model.bases,project);highlight();}
@@ -24,8 +28,8 @@ $('part').onchange=()=>choose($('part').value);
 for(const id of ['name','height','paint'])$(id).onchange=()=>{snapshot();project[id]=id==='height'?T.MathUtils.clamp(Number($(id).value)||4.8,1,20):$(id).value;rebuild();};
 $('visible').onchange=()=>{snapshot();project.transforms[selected]={...transform(),visible:$('visible').checked};mirror();rebuild();};
 $('save').onclick=()=>save();$('resetPart').onclick=()=>{snapshot();delete project.transforms[selected];rebuild();};
-$('undo').onclick=()=>{if(history.length){future.push(JSON.stringify(project));project=JSON.parse(history.pop());rebuild();}};
-$('redo').onclick=()=>{if(future.length){history.push(JSON.stringify(project));project=JSON.parse(future.pop());rebuild();}};
+$('undo').onclick=()=>{if(history.length){future.push(projectSnapshot());project=history.pop();rebuild();}};
+$('redo').onclick=()=>{if(future.length){history.push(projectSnapshot());project=future.pop();rebuild();}};
 $('reset').onclick=()=>{snapshot();project=freshProject();rebuild();toast('A-11初期状態へ戻しました。「戻す」で復元できます');};
 $('pose').oninput=()=>{applyTransforms(model.nodes,model.bases,project);const a=T.MathUtils.degToRad(Number($('pose').value));for(const side of ['L','R']){model.nodes[`forearm${side}`].rotation.x-=a;model.nodes[`shin${side}`].rotation.x+=a*.7;}model.root.updateMatrixWorld(true);helper?.update();};
 function appearance(){const wire=$('wire').checked,opacity=refImage&&view!=='orbit'?Number($('modelOpacity').value):1;model.root.traverse(o=>{if(!o.isMesh)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){if(m.isMeshStandardMaterial){m.wireframe=wire;m.transparent=opacity<1;m.opacity=opacity;m.depthWrite=opacity>=1;}}});}
@@ -56,7 +60,7 @@ $('makePlate').onclick=()=>{if(points.length<3){toast('外周を3点以上タッ
 $('deletePlate').onclick=()=>{if(!project.plates.some(p=>p.id===selected)){toast('作成した装甲を選んでください');return;}snapshot();project.plates=project.plates.filter(p=>p.id!==selected);delete project.transforms[selected];selected='torso';rebuild();};
 function download(blob,ext){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=(project.name.replace(/[^\w\u3040-\u9fff-]+/g,'_')||'mech')+ext;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('ファイルを書き出しました');}
 $('json').onclick=()=>download(new Blob([JSON.stringify(project,null,2)],{type:'application/json'}),'.mech.json');
-$('jsonFile').onchange=async()=>{try{const file=$('jsonFile').files[0];if(!file)return;if(file.size>12e6)throw Error('JSONは12MB以下を選んでください');const p=normalizeProject(JSON.parse(await file.text()));snapshot();project=p;rebuild();toast('機体を読み込みました');}catch(e){toast(e.message);}};
+$('jsonFile').onchange=async()=>{try{const file=$('jsonFile').files[0];if(!file)return;if(file.size>24e6)throw Error('JSONは24MB以下を選んでください');const p=normalizeProject(JSON.parse(await file.text()));snapshot();project=p;rebuild();toast('機体を読み込みました');}catch(e){toast(e.message);}};
 $('glb').onclick=async()=>{const button=$('glb');button.disabled=true;try{applyTransforms(model.nodes,model.bases,project);$('pose').value=0;model.root.updateMatrixWorld(true);const out=cleanExport(model.root);out.traverse(o=>{if(o.isMesh){o.material=o.material.clone();if(o.material.isMeshStandardMaterial){o.material.opacity=1;o.material.transparent=false;o.material.wireframe=false;o.material.depthWrite=true;}}});const data=await new GLTFExporter().parseAsync(out,{binary:true,trs:true,onlyVisible:true,maxTextureSize:1024});download(new Blob([data],{type:'model/gltf-binary'}),'.glb');}catch(e){toast('GLB出力失敗: '+e.message);}finally{button.disabled=false;}};
 $('obj').onclick=()=>{applyTransforms(model.nodes,model.bases,project);$('pose').value=0;model.root.updateMatrixWorld(true);const lines=['# MECH FORGE: meters, Y up, +Z forward'],v=new T.Vector3(),n=new T.Vector3();let offset=1;model.root.traverseVisible(o=>{if(!o.isMesh)return;const g=o.geometry,p=g.attributes.position,norm=g.attributes.normal,matrix=new T.Matrix3().getNormalMatrix(o.matrixWorld);lines.push('o '+(o.parent.name||o.name||'armor'));for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);lines.push(`v ${v.x} ${v.y} ${v.z}`);}for(let i=0;i<p.count;i++){n.fromBufferAttribute(norm,i).applyMatrix3(matrix).normalize();lines.push(`vn ${n.x} ${n.y} ${n.z}`);}const count=g.index?.count||p.count;for(let i=0;i<count;i+=3){const ids=[0,1,2].map(j=>(g.index?g.index.getX(i+j):i+j)+offset);lines.push('f '+ids.map(k=>`${k}//${k}`).join(' '));}offset+=p.count;});download(new Blob([lines.join('\n')],{type:'text/plain'}),'.obj');};
 rebuild();loadRefControls();setView('orbit');toast('MECH FORGEを起動しました');
@@ -69,14 +73,14 @@ $('autoGenerate').onclick=async()=>{
  const button=$('autoGenerate');button.disabled=true;button.textContent='輪郭を解析・立体化しています…';
  $('autoReport').textContent='端末内で処理しています。高精細では数秒〜数十秒かかる場合があります。';
  try{
-  const images={};for(const key of $('autoLayout').value==='four'?['front','left','back']:['front']){
-   const r=refs[key],a=r.crop,canvas=document.createElement('canvas');canvas.width=canvas.height=256;const c=canvas.getContext('2d',{willReadFrequently:true});
-   const sw=Math.max(1,a[2]*refImage.width),sh=Math.max(1,a[3]*refImage.height);c.drawImage(refImage,a[0]*refImage.width,a[1]*refImage.height,sw,sh,0,0,256,256);
-   const data=c.getImageData(0,0,256,256);images[key]={width:256,height:256,data:data.data,aspect:sw/sh};
+  const images={};for(const key of $('autoLayout').value==='four'?['front','left','right','back']:['front']){
+   const r=refs[key],a=r.crop,canvas=document.createElement('canvas');canvas.width=canvas.height=Number($('autoResolution').value)>=96?384:256;const c=canvas.getContext('2d',{willReadFrequently:true});
+   const sw=Math.max(1,a[2]*refImage.width),sh=Math.max(1,a[3]*refImage.height);c.drawImage(refImage,a[0]*refImage.width,a[1]*refImage.height,sw,sh,0,0,canvas.width,canvas.height);
+   const data=c.getImageData(0,0,canvas.width,canvas.height);images[key]={width:canvas.width,height:canvas.height,data:data.data,aspect:sw/sh};
   }
-  const result=await new Promise((resolve,reject)=>{const worker=new Worker(new URL('./reconstruct-worker.js?v=2.1.0',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(Error('処理時間が長すぎます。標準精度でもう一度生成してください'));},90000);const finish=()=>{clearTimeout(timeout);worker.terminate();};worker.onmessage=e=>{finish();e.data.ok?resolve(e.data.result):reject(Error(e.data.error));};worker.onerror=()=>{finish();reject(Error('画像解析を起動できません。ページを再読み込みしてください'));};worker.postMessage({images,options:{threshold:Number($('autoThreshold').value),resolution:Number($('autoResolution').value)}});});
+  const result=await new Promise((resolve,reject)=>{const worker=new Worker(new URL('./reconstruct-worker.js?v=2.2.0',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(Error('処理時間が長すぎます。標準精度でもう一度生成してください'));},90000);const finish=()=>{clearTimeout(timeout);worker.terminate();};worker.onmessage=e=>{finish();e.data.ok?resolve(e.data.result):reject(Error(e.data.error));};worker.onerror=()=>{finish();reject(Error('画像解析を起動できません。ページを再読み込みしてください'));};worker.postMessage({images,options:{threshold:Number($('autoThreshold').value),resolution:Number($('autoResolution').value)}});});
   snapshot();project.reconstruction=result;project.transforms={};project.plates=[];selected='torso';rebuild();setView('orbit');
-  $('autoReport').textContent=`生成完了：${result.filled.toLocaleString()}個の体積セルから、${(result.faces.length*2).toLocaleString()}三角形を生成。${result.views===2?'正面＋側面の輪郭から奥行きを推定':'一枚絵から奥行きを仮定'}。部品タブで補正し、出力タブからGLBを書き出せます。`;
+  $('autoReport').textContent=`生成完了：${result.filled.toLocaleString()}個の体積セルから、${(result.triangleCount||result.faces?.length*2).toLocaleString()}三角形を生成。${result.views>1?'四面図の高さを合わせて連続した立体表面を生成':'一枚絵から奥行きを仮定'}。${result.fit?'輪郭一致度：'+Object.entries(result.fit).map(([key,value])=>({front:'正面',back:'背面',left:'左',right:'右'}[key])+value+'%').join(' / ')+'（抽出輪郭との投影比較）。':''}部品タブで補正し、出力タブからGLBを書き出せます。`;
   toast('画像から3Dモデルを生成しました');
  }catch(e){$('autoReport').textContent=e.message;toast(e.message);}finally{button.disabled=false;button.textContent='画像を解析して3Dモデルを自動生成';}
 };
