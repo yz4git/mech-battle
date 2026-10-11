@@ -1,6 +1,6 @@
 import * as T from '../vendor/three.module.min.js';
 import {GLTFExporter} from '../vendor/GLTFExporter.js';
-import {freshProject,normalizeProject,makeEditorModel,applyTransforms,cleanExport,modelStats,disposeModel,EDITOR_KEY} from './editor-model.js?v=2.0.0';
+import {freshProject,normalizeProject,makeEditorModel,applyTransforms,cleanExport,modelStats,disposeModel,EDITOR_KEY} from './editor-model.js?v=2.1.0';
 const $=id=>document.getElementById(id),stage=$('stage'),status=$('status');let timer;
 function toast(s){status.textContent=s;status.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>status.classList.remove('show'),3500);}
 let project=freshProject();try{const raw=localStorage.getItem(EDITOR_KEY);if(raw)project=normalizeProject(JSON.parse(raw));}catch{}
@@ -56,10 +56,29 @@ $('makePlate').onclick=()=>{if(points.length<3){toast('外周を3点以上タッ
 $('deletePlate').onclick=()=>{if(!project.plates.some(p=>p.id===selected)){toast('作成した装甲を選んでください');return;}snapshot();project.plates=project.plates.filter(p=>p.id!==selected);delete project.transforms[selected];selected='torso';rebuild();};
 function download(blob,ext){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=(project.name.replace(/[^\w\u3040-\u9fff-]+/g,'_')||'mech')+ext;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('ファイルを書き出しました');}
 $('json').onclick=()=>download(new Blob([JSON.stringify(project,null,2)],{type:'application/json'}),'.mech.json');
-$('jsonFile').onchange=async()=>{try{const file=$('jsonFile').files[0];if(!file)return;if(file.size>2e6)throw Error('JSONは2MB以下を選んでください');const p=normalizeProject(JSON.parse(await file.text()));snapshot();project=p;rebuild();toast('機体を読み込みました');}catch(e){toast(e.message);}};
+$('jsonFile').onchange=async()=>{try{const file=$('jsonFile').files[0];if(!file)return;if(file.size>12e6)throw Error('JSONは12MB以下を選んでください');const p=normalizeProject(JSON.parse(await file.text()));snapshot();project=p;rebuild();toast('機体を読み込みました');}catch(e){toast(e.message);}};
 $('glb').onclick=async()=>{const button=$('glb');button.disabled=true;try{applyTransforms(model.nodes,model.bases,project);$('pose').value=0;model.root.updateMatrixWorld(true);const out=cleanExport(model.root);out.traverse(o=>{if(o.isMesh){o.material=o.material.clone();if(o.material.isMeshStandardMaterial){o.material.opacity=1;o.material.transparent=false;o.material.wireframe=false;o.material.depthWrite=true;}}});const data=await new GLTFExporter().parseAsync(out,{binary:true,trs:true,onlyVisible:true,maxTextureSize:1024});download(new Blob([data],{type:'model/gltf-binary'}),'.glb');}catch(e){toast('GLB出力失敗: '+e.message);}finally{button.disabled=false;}};
 $('obj').onclick=()=>{applyTransforms(model.nodes,model.bases,project);$('pose').value=0;model.root.updateMatrixWorld(true);const lines=['# MECH FORGE: meters, Y up, +Z forward'],v=new T.Vector3(),n=new T.Vector3();let offset=1;model.root.traverseVisible(o=>{if(!o.isMesh)return;const g=o.geometry,p=g.attributes.position,norm=g.attributes.normal,matrix=new T.Matrix3().getNormalMatrix(o.matrixWorld);lines.push('o '+(o.parent.name||o.name||'armor'));for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);lines.push(`v ${v.x} ${v.y} ${v.z}`);}for(let i=0;i<p.count;i++){n.fromBufferAttribute(norm,i).applyMatrix3(matrix).normalize();lines.push(`vn ${n.x} ${n.y} ${n.z}`);}const count=g.index?.count||p.count;for(let i=0;i<count;i+=3){const ids=[0,1,2].map(j=>(g.index?g.index.getX(i+j):i+j)+offset);lines.push('f '+ids.map(k=>`${k}//${k}`).join(' '));}offset+=p.count;});download(new Blob([lines.join('\n')],{type:'text/plain'}),'.obj');};
 rebuild();loadRefControls();setView('orbit');toast('MECH FORGEを起動しました');
 // Included reference is a local asset; imported photos never leave this browser.
 loadImage('./assets/a11-reference.webp').then(()=>{preset();setView('orbit');}).catch(()=>{});
 function frame(){if(!document.hidden){helper?.update();renderer.render(scene,camera);}requestAnimationFrame(frame);}frame();
+
+$('autoGenerate').onclick=async()=>{
+ if(!refImage){toast('参考画像を読み込んでください');return;}
+ const button=$('autoGenerate');button.disabled=true;button.textContent='輪郭を解析・立体化しています…';
+ $('autoReport').textContent='端末内で処理しています。高精細では数秒〜数十秒かかる場合があります。';
+ try{
+  const images={};for(const key of $('autoLayout').value==='four'?['front','left','back']:['front']){
+   const r=refs[key],a=r.crop,canvas=document.createElement('canvas');canvas.width=canvas.height=256;const c=canvas.getContext('2d',{willReadFrequently:true});
+   const sw=Math.max(1,a[2]*refImage.width),sh=Math.max(1,a[3]*refImage.height);c.drawImage(refImage,a[0]*refImage.width,a[1]*refImage.height,sw,sh,0,0,256,256);
+   const data=c.getImageData(0,0,256,256);images[key]={width:256,height:256,data:data.data,aspect:sw/sh};
+  }
+  const result=await new Promise((resolve,reject)=>{const worker=new Worker(new URL('./reconstruct-worker.js?v=2.1.0',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(Error('処理時間が長すぎます。標準精度でもう一度生成してください'));},90000);const finish=()=>{clearTimeout(timeout);worker.terminate();};worker.onmessage=e=>{finish();e.data.ok?resolve(e.data.result):reject(Error(e.data.error));};worker.onerror=()=>{finish();reject(Error('画像解析を起動できません。ページを再読み込みしてください'));};worker.postMessage({images,options:{threshold:Number($('autoThreshold').value),resolution:Number($('autoResolution').value)}});});
+  snapshot();project.reconstruction=result;project.transforms={};project.plates=[];selected='torso';rebuild();setView('orbit');
+  $('autoReport').textContent=`生成完了：${result.filled.toLocaleString()}個の体積セルから、${(result.faces.length*2).toLocaleString()}三角形を生成。${result.views===2?'正面＋側面の輪郭から奥行きを推定':'一枚絵から奥行きを仮定'}。部品タブで補正し、出力タブからGLBを書き出せます。`;
+  toast('画像から3Dモデルを生成しました');
+ }catch(e){$('autoReport').textContent=e.message;toast(e.message);}finally{button.disabled=false;button.textContent='画像を解析して3Dモデルを自動生成';}
+};
+
+$('autoLayout').onchange=()=>{if($('autoLayout').value==='single'){refs.front.crop=[0,0,1,1];setView('front');}else{preset();setView('front');}};

@@ -1,4 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
+import {makeReconstructedModel,validateReconstruction} from './reconstructed-model.js?v=2.1.0';
 import {createReferenceFrame} from './reference-frame.js?v=2.0.0';
 import {batchRigidMeshes} from './mesh-batch.js?v=1.9.0';
 import {starterLoadout,getPart} from './parts.js?v=1.9.0';
@@ -10,14 +11,16 @@ export function normalizeProject(raw){
  const p=freshProject();p.name=String(raw.name||p.name).slice(0,60);p.height=Math.max(1,Math.min(20,Number(raw.height)||4.8));p.paint=/^#[\da-f]{6}$/i.test(raw.paint)?raw.paint:p.paint;
  for(const [key,v]of Object.entries(raw.transforms||{}).slice(0,200))p.transforms[key]={position:vec(v.position,0,-10,10),rotation:vec(v.rotation,0,-180,180),scale:vec(v.scale,1,.1,3),visible:v.visible!==false};
  p.plates=(Array.isArray(raw.plates)?raw.plates:[]).slice(0,100).map((v,i)=>({id:/^plate_[a-z0-9_]+$/i.test(v.id)?v.id:`plate_${i}`,parent:String(v.parent||'torso'),points:(v.points||[]).slice(0,64).map(a=>vec(a,0,-3,3).slice(0,2)),depth:Math.max(.01,Math.min(2,Number(v.depth)||.12)),bevel:Math.max(0,Math.min(.1,Number(v.bevel)||.02)),color:/^#[\da-f]{6}$/i.test(v.color)?v.color:p.paint})).filter(v=>v.points.length>=3);
+ if(raw.reconstruction)p.reconstruction=validateReconstruction(raw.reconstruction);
  return p;
 }
 export function makeEditorModel(project){
  const build=starterLoadout(),parts=Object.fromEntries(Object.entries(build).map(([k,v])=>[k,getPart(v)]));
- const root=createReferenceFrame(build,parts,0,false,[{color:new T.Color(project.paint).getHex()}],false,true,true,false,true);
- const nodes=root.userData.editorNodes;
+ const generated=project.reconstruction?makeReconstructedModel(project.reconstruction,project.height):null;
+ const root=generated?.root||createReferenceFrame(build,parts,0,false,[{color:new T.Color(project.paint).getHex()}],false,true,true,false,true);
+ const nodes=generated?.nodes||root.userData.editorNodes;
  // Place elbow and knee pivots where the mechanical hinges are, without moving the rest mesh.
- for(const side of ['L','R']){
+ if(!generated)for(const side of ['L','R']){
   const arm=nodes[`arm${side}`],fore=nodes[`forearm${side}`],leg=nodes[`leg${side}`],shin=nodes[`shin${side}`],boot=nodes[`boot${side}`];
   if(fore){pivot(fore,new T.Vector3(0,-.97,0));if(nodes[`weapon${side}`])fore.attach(nodes[`weapon${side}`]);
    // Fingers, wrist and hand are rigid to the forearm.
@@ -25,7 +28,7 @@ export function makeEditorModel(project){
   }
   if(shin){pivot(shin,new T.Vector3(0,-1.15,0));if(boot)shin.attach(boot);if(nodes[`ankle${side}`])shin.attach(nodes[`ankle${side}`]);if(nodes[`knee${side}`])shin.attach(nodes[`knee${side}`]);}
  }
- for(const [name,node]of Object.entries(nodes)){
+ if(!generated)for(const [name,node]of Object.entries(nodes)){
   if(!['torso','hips','armL','armR','legL','legR','forearmL','forearmR','shinL','shinR'].includes(name)){
    root.updateMatrixWorld(true);const box=new T.Box3().setFromObject(node);if(!box.isEmpty())pivot(node,node.worldToLocal(box.getCenter(new T.Vector3())));
   }

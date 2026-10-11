@@ -162,3 +162,5 @@ Three.js 0.179.1：MIT（`vendor/THREE-LICENSE.txt`）。
 ## MECH FORGE / robot character editor
 
 Open `editor.html` (or the MECH FORGE link in the game). The supplied A-11 four-view reference and previous contour model are included. Edit named parts with mirrored transforms, compare cropped orthographic reference overlays, trace bevelled 3D armor, check elbow/knee movement, undo/redo and save locally. Export GLB with embedded textures and rigid hierarchy, OBJ geometry or editable project JSON. This is assisted reconstruction, not automatic complete image-to-3D replication. [Research, limitations and export use](docs/robot-modeling.md).
+
+MECH FORGE v2.1 adds browser-local automatic visual-hull generation from reference images, projected colors, heuristic rigid part splitting, and reusable GLB/JSON output. No inference server or pretrained weights are required. Generated block surfaces are approximations and require refinement for final game assets.
