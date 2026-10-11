@@ -139,7 +139,7 @@ function referenceLeg(root,s,cy,p,c,accent,nodes){
  hinge(leg,0,-2.31,-.06,.165,.54,c);const ankleGroup=group(leg);nodes[s<0?'ankleL':'ankleR']=ankleGroup;a11Plate(ankleGroup,'ankle',.5,.32,.23,0,-2.31,.19,c.paint);
  moduleArmor(leg,p.armorLegs,.23,.31,-s*.08,-1.68,.432,c);leg.userData.foot=referenceFoot(leg,c,accent,s);nodes[s<0?'bootL':'bootR']=leg.userData.foot;return leg;
 }
-export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrated=true,detailed=true,captureComparison=false){
+export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrated=true,detailed=true,captureComparison=false,editor=false){
  setGeometryDetail(reduced);
  const root=new T.Group(),cy=4.07,heavy=p.body.kind==='bulwark',recon=p.body.kind==='wraith',sx=heavy?1.16:recon?.9:1;
  const colors=part=>palette(paints[paint]?.color??MAKERS[part.maker].color),c=colors(p.body),accent=enemy?0xff7834:0xff8b22;
@@ -260,6 +260,14 @@ export function createReferenceFrame(build,p,paint,enemy,paints,reduced,calibrat
  root.userData.proportions=measurements(root,torso,arms,legs,calibrated);
  if(captureComparison)root.userData.referenceComparison=compareA11Nodes(nodes,ctx);
  for(const g of [torso,...Object.values(arms),...Object.values(guns),...Object.values(shoulders),...legs])g.userData.articulated=true;
- flattenRigidGroups(root);batchRigidMeshes(root);
+ if(editor){
+  for(const [name,node] of Object.entries(nodes)){node.name=name;node.userData.articulated=true;}
+  torso.name='torso';hips.name='hips';
+  for(const [name,node] of Object.entries(arms))node.name=name;
+  legs.forEach((node,i)=>node.name=i===0?'legL':'legR');
+  for(const [name,node] of Object.entries(guns))node.name=name;
+  for(const [name,node] of Object.entries(shoulders))node.name=name;
+  root.userData.editorNodes={torso,hips,...nodes,...arms,...guns,...shoulders,legL:legs[0],legR:legs[1]};
+ }else{flattenRigidGroups(root);batchRigidMeshes(root);}
  const local=new Map();root.traverse(o=>{if(!o.isMesh||o.material.userData.shared||o.material.isMeshBasicMaterial)return;let m=local.get(o.material);if(!m){m=o.material.clone();m.userData.baseEmissive=m.emissive.clone();m.userData.baseIntensity=m.emissiveIntensity;local.set(o.material,m);}o.material=m;});root.userData.materials=[...local.values()];setGeometryDetail(false);return root;
 }

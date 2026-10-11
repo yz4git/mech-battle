@@ -158,3 +158,7 @@ Three.js 0.179.1：MIT（`vendor/THREE-LICENSE.txt`）。
 
 1.2の装甲テクスチャの制作情報は `assets/README.md` を参照。1.4の機体は `src/mech-surface.js` の共有CanvasTextureを使用し、細かい塗装の揺らぎのみを付けています。
 
+
+## MECH FORGE / robot character editor
+
+Open `editor.html` (or the MECH FORGE link in the game). The supplied A-11 four-view reference and previous contour model are included. Edit named parts with mirrored transforms, compare cropped orthographic reference overlays, trace bevelled 3D armor, check elbow/knee movement, undo/redo and save locally. Export GLB with embedded textures and rigid hierarchy, OBJ geometry or editable project JSON. This is assisted reconstruction, not automatic complete image-to-3D replication. [Research, limitations and export use](docs/robot-modeling.md).
